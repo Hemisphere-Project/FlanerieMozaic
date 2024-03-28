@@ -6,9 +6,8 @@
 ### Install
 
 ```
-git clone https://github.com/Hemisphere-Project/Flanerie.git
+git clone --branch erasme-24 https://github.com/Hemisphere-Project/Flanerie.git
 cd Flanerie
-git checkout erasme-24
 npm install
 ```
 
