@@ -63,4 +63,15 @@ ERASME
 - Dbltap : show/hide ctrl
 - Pi4 player 
 
+***********
+POST-ERASME
+***********
+- QR Code generator
+- Keyboard shortcut controler
+	* Move / Zoom stage 
+	* Move / Zoom selected player
+- Lock clients moves
+- Pi 90° / FullHD -> lags
+
+
 

@@ -318,6 +318,10 @@ server.listen(3000, function() {
   console.log('listening on *:3000');
 });
 
+app.get(['/qr', '/qrcode'], function(req, res) {
+  res.sendFile(__dirname + '/www/qr.html');
+});
+
 app.get('/control/:room?', function(req, res) {
   res.sendFile(__dirname + '/www/control.html');
 });
