@@ -73,6 +73,7 @@ $("#ctrls").click((e) => {
 })
 
 $('#clear').click(() => {
+    if (!confirm('Clear all inactive devices?')) return
     socket.emit('clearDevices', room)
 })
 
@@ -101,12 +102,32 @@ $('#guest').click(() => {
 })
 
 // DRAG VIDEO -> MOVE ALL DEVICES
-player.video.on('drag', (e, delta) => {
-    // socket.emit('move', uuid, delta)
-    socket.emit('moveAll', room, delta)
+// player.video.on('drag', (e, delta) => {
+//     // socket.emit('move', uuid, delta)
+//     socket.emit('moveAll', room, delta)
 
-    delta = {x: delta.x*player.stagescale, y: delta.y*player.stagescale}
+//     delta = {x: delta.x*player.stagescale, y: delta.y*player.stagescale}
+//     player.moveStage(delta)
+// })
+
+// DOUBLE CLICK VIDEO => SELECT ALL DEVICES
+// player.video.on('dblclick', (e) => {
+//     devices.toggleSel()
+// })
+
+// CATCH DBLC CLICK #controls
+$('#controls').on('dblclick', (e) => {
+    e.stopPropagation()
+})
+
+// DRAG VIDEO -> DRAG STAGE
+player.video.on('drag', (e, delta) => {
     player.moveStage(delta)
+})
+
+// DOUBLE CLICK STAGE => SELECT ALL DEVICES
+player.backstage.on('dblclick', (e) => {
+    devices.toggleSel()
 })
 
 // DRAG STAGE
@@ -132,6 +153,36 @@ document.getElementById('controls').addEventListener('wheel', (e) => {
 
 // RELOAD
 $('#reloadAll').click(() => {
+    if (!confirm('Reload all devices?')) return
     socket.emit('reloadAll', room)
 })
 
+// SELECT
+$('#selectAll').click(() => {
+    devices.toggleSel()
+})
+
+
+// KEYBOARD CONTROL
+//
+
+// arrow key to move
+$('body').on('keydown', (e)=>{
+    var deltaPos = {x: 0, y: 0}
+    if (e.key == 'ArrowUp') deltaPos.y = -1
+    if (e.key == 'ArrowDown') deltaPos.y = 1
+    if (e.key == 'ArrowLeft') deltaPos.x = -1
+    if (e.key == 'ArrowRight') deltaPos.x = 1
+    if (deltaPos.x || deltaPos.y)
+        $('.selected').each((i, e) => {
+            $(e).triggerHandler('drag', deltaPos)
+        })
+
+    var deltaZoom = 0
+    if (e.key == '+') deltaZoom = 0.01
+    if (e.key == '-') deltaZoom = -0.01
+    if (deltaZoom)
+        $('.selected').each((i, e) => {
+            $(e).triggerHandler('zoomdelta', deltaZoom)
+        })
+})

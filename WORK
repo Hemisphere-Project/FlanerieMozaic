@@ -66,12 +66,12 @@ ERASME
 ***********
 POST-ERASME
 ***********
-- QR Code generator
 - Keyboard shortcut controler
 	* Move / Zoom stage 
 	* Move / Zoom selected player
-- Lock clients moves
 - Pi 90° / FullHD -> lags
 
-
-
+- FFMPEG export vignette !
+- Upload video => file manager
+- Apk kiosk
+- Regie split => Files / Mapping / Playback

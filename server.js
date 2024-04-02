@@ -323,7 +323,7 @@ app.get(['/qr', '/qrcode'], function(req, res) {
 });
 
 app.get('/control/:room?', function(req, res) {
-  res.sendFile(__dirname + '/www/control.html');
+  res.sendFile(__dirname + '/www/mapping.html');
 });
 
 app.get('/:room?', function(req, res) {

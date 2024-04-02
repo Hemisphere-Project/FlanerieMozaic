@@ -46,8 +46,9 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    /* border: 1px solid red; */
-    background-color: rgba(200, 0, 200, 0.5);
+    border: 2px solid cyan;
+    /* background-color: rgba(200, 0, 200, 0.5); */
+    background-color: transparent;
     z-index: 85;
     flex-direction: column;
     justify-content: center;
@@ -79,6 +80,8 @@ body {
     display: none; 
 }
 
+/* Controls */
+
 #controls {
     position: absolute;
     top: 0;
@@ -90,9 +93,9 @@ body {
     box-sizing: border-box;
     border: 1px solid red;
     z-index: 90;
-    background-color: rgba(125, 125, 125, 0.5);
+    background-color: rgba(50, 50, 50, 0.8);
     font-size: 16px;
-    line-height: 20px;
+    line-height: 25px;
     overflow-y: auto;
     overflow-x: hidden;
 }
@@ -102,12 +105,26 @@ body {
     height: 30px;
 }
 
-#playlist {
-    display: nonewelcome;
+#controls #selectAll {
+    border: 2px solid cyan;
 }
 
+#controls #ctrls {
+    border: 1px solid red;
+}
+
+#controls #mediaBtn {
+    display: none;
+}
+
+#playlist {
+    /* display: none; */
+}
+
+
+
 .btn {
-    border: 2px solid #fff;
+    border: 2px solid #666;
     background-color: transparent;
     color: #fff;
     font-size: 17px;
@@ -150,10 +167,8 @@ body {
     transform: scaleX(-1);
 }
 
-#zoomMinus, #zoomPlus {
-    position: relative;
-    top: -27px;
-    left: 86px;
+#zoomSlider {
+    float:right;
 }
 
 #reset {
@@ -186,4 +201,22 @@ body {
 .device.selected, .device.alive.selected, .device.guest.selected {
     border: 2px solid #0ff;
     background-color: rgba(30, 30, 30, 0.5);
+}
+
+/* device controls */
+
+.devCtrls {
+    padding: 20px;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.devCtrls, .devCtrls > button, .devCtrls > input, .devCtrls > select {
+    font-size: 35px;
+}
+
+.devCtrls .btnZoom {
+    height: 60px;
+    width: 60px;
+    margin-left: 10px;
 }

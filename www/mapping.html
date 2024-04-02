@@ -26,8 +26,7 @@
   <body>
 
     <div id="controls">
-      =CONTROL=
-      <br />
+      = MAPPING =
       <br />
       <u>Stage:</u><br />
       <button id="clear" class="btn">Clear</button>
@@ -37,18 +36,22 @@
 
 
       <u>All devices:</u><br />
-      <button id="reloadAll" class="btn">Reload</button>
+      <button id="selectAll" class="btn">Select</button>
       <button id="ctrls" class="btn">Controls</button><br />
       <button id="pause" class="btn">Pause</button>
       <button id="stop" class="btn">Stop</button><br />
+      <button id="reloadAll" class="btn">Reload</button>
       
       <br />
-      Z: <span id="zoom">100%</span><br />
-      <i data-feather="minus-circle" id="zoomMinus"></i>
-      <i data-feather="plus-circle" id="zoomPlus"></i>
-      
       <br />
-      
+      <u>Video:</u><br />
+      <div id="zoomSlider">
+        <i data-feather="minus-circle" id="zoomMinus"></i>
+        <i data-feather="plus-circle" id="zoomPlus"></i>
+      </div>
+      Zoom: <span id="zoom">100%</span><br />
+
+      <br />
       <u>Media:</u><br />
       <button id="mediaBtn" class="btn">Playlist</button>
       <button id="camera" class="btn">Camera</button><br />

@@ -22,11 +22,17 @@ class Device {
 
         this.dom.on('dragstart', () => { this.select(true) })
         this.dom.on('dragend', () => { this.select(false) })
-        this.dom.on('dblclick', () => { this.select(true) })
+        this.dom.on('dblclick', () => { this.select(true); return false; })
 
+        // Drag
         this.dom.on('drag', (e, delta) => {
             let d = {x: -1*delta.x/player.stagescale, y: -1*delta.y/player.stagescale}
             socket.emit('move', uuid, room, d)
+        })
+
+        // Zoom
+        this.dom.on('zoomdelta', (e, delta) => {
+            socket.emit('zoomdevice', room, this.uuid, Math.max(0.1, this.zoomdevice + delta))
         })
 
         // device controls
@@ -39,6 +45,7 @@ class Device {
         })
         
         // mode select
+        $(controls).append('<br>')
         var mode = $('<select></select>').appendTo(controls)
         mode.append('<option value="new">new</option>')
         mode.append('<option value="fixed">fixed</option>')
@@ -47,21 +54,23 @@ class Device {
             let newmode = $(e.target).val()
             socket.emit('mode', this.room, this.uuid, newmode)
         })
-
-        // remove
-        $('<button>remove</button>').appendTo(controls).on('click', () => {
-            socket.emit('remove', room, this.uuid)
-        })
+        $(controls).append('<br><br>')
 
         // zoomdevice
         $('<div class="zdev">zoom <span></span></div>').appendTo(controls)
-        $('<button>+</button>').appendTo(controls).on('click', () => {
-            socket.emit('zoomdevice', room, this.uuid, this.zoomdevice + 0.01)
+        $('<button class="btnZoom">-</button>').appendTo(controls).on('click', () => {
+            this.dom.trigger('zoomdelta', -0.01)
         })
-        $('<button>-</button>').appendTo(controls).on('click', () => {
-            socket.emit('zoomdevice', room, this.uuid, Math.max(0.1, this.zoomdevice - 0.01))
+        $('<button class="btnZoom">+</button>').appendTo(controls).on('click', () => {
+            this.dom.trigger('zoomdelta', 0.01)
         })
 
+        // remove
+        $(controls).append('<br><br>')
+        $('<button class="btnRem">remove</button>').appendTo(controls).on('click', () => {
+            socket.emit('remove', room, this.uuid)
+        })
+        
     }
 
     update(data) {
@@ -131,6 +140,16 @@ class DevicePool {
         if (!this.devices[uuid]) return
         this.devices[uuid].remove()
         delete this.devices[uuid]
+    }
+
+    toggleSel() {
+        var doSel = true
+
+        for (let uuid in this.devices) 
+            if (this.devices[uuid].selected) doSel = false
+        
+        for (let uuid in this.devices)
+            this.devices[uuid].select(doSel)
     }
 
 }
