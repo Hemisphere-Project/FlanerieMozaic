@@ -5,6 +5,7 @@ import { Server as IoServer } from "socket.io";
 import Conf from 'conf';
 import fs from 'fs';
 
+console.log("\n === Flanerie Mozaic Server === \n")
 
 const __dirname = new URL('.', import.meta.url).pathname;
 // const options={
@@ -14,6 +15,8 @@ const __dirname = new URL('.', import.meta.url).pathname;
 
 const config = new Conf({projectName: 'panoptic'});
 // config.clear();
+
+console.log("Loading config from: ", config.path)
 
 var app = express();
 var server = HttpServer(app);
@@ -63,7 +66,7 @@ for (let room in devices)
     if (!devices[room][uuid].zoomdevice) devices[room][uuid].zoomdevice = 1.0;
   }
 
-console.log('devices', devices);
+// console.log('devices', devices);
 
 // Create a new device entry if it doesn't exist
 function bootstrapDevice(uuid, room, reso) {
@@ -98,10 +101,10 @@ function updateDevices(room) {
 //
 io.on('connection', (socket) => 
 {
-  console.log('a user connected');
+  //console.log('a user connected');
 
   socket.on('disconnect', () => {
-    console.log('user disconnected');
+    //console.log('user disconnected');
     if (socket.uuid && devices[socket.room]) {
       devices[socket.room][socket.uuid].alive = false;
       if (socket.uuid.startsWith('guest')) devices[socket.room][socket.uuid].resolution = {x: 400, y: 800};
