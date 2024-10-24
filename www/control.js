@@ -101,6 +101,9 @@ $('#guest').click(() => {
     socket.emit('guestAdd', room)
 })
 
+// change href
+document.getElementById('browser_link').href = window.location.protocol + "//" + window.location.hostname + ":8080/";
+
 // DRAG VIDEO -> MOVE ALL DEVICES
 // player.video.on('drag', (e, delta) => {
 //     // socket.emit('move', uuid, delta)

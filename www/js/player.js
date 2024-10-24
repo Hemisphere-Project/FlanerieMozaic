@@ -108,7 +108,7 @@ class VideoPlayer {
                 this.video[0].srcObject.getTracks().forEach(track => track.stop());
                 this.video[0].srcObject = null
             }
-            this.video.attr('src', '/static/video/'+media)
+            this.video.attr('src', '/media/'+media)
             this.video[0].load()
             this.video[0].pause()
         }

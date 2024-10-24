@@ -4,6 +4,11 @@ import { Server as HttpServer } from 'http';
 import { Server as IoServer } from "socket.io";
 import Conf from 'conf';
 import fs from 'fs';
+import 'dotenv/config'
+
+if (!'PORT' in process.env) process.env.PORT = 5000;
+if (!'VIDEO_PATH' in process.env) process.env.VIDEO_PATH = './www/video';
+
 
 
 const __dirname = new URL('.', import.meta.url).pathname;
@@ -34,12 +39,13 @@ if (!state['default'])
 
 // PLAYLIST from list of files in /video
 //
-var playlist = fs.readdirSync('./www/video').filter((f) => f.endsWith('.mp4'));
+var playlist = fs.readdirSync(process.env.VIDEO_PATH).filter((f) => f.endsWith('.mp4'));
 
 // watch for changes in /video
-fs.watch('./www/video', (eventType, filename) => {
-  playlist = fs.readdirSync('./www/video').filter((f) => f.endsWith('.mp4'));
+fs.watch(process.env.VIDEO_PATH, (eventType, filename) => {
+  playlist = fs.readdirSync(process.env.VIDEO_PATH).filter((f) => f.endsWith('.mp4'));
   io.emit('playlist', playlist);
+  console.log('playlist', playlist);
 })
 
 // SYNC Server
@@ -121,7 +127,7 @@ io.on('connection', (socket) =>
     updateDevices(room);
     socket.emit('state', state[room])
     socket.emit('playlist', playlist)
-    console.log('hi', uuid, room, reso);
+    console.log('hi', uuid, room, reso, playlist);
 
     // if new, try to move to a dead guest
     if (devices[room][uuid].mode === 'new') {
@@ -314,8 +320,8 @@ io.on('connection', (socket) =>
 // Express Server
 //
 
-server.listen(5000, function() {
-  console.log('listening on *:3000');
+server.listen(process.env.PORT, function() {
+  console.log('listening on *:' + process.env.PORT);
 });
 
 app.get(['/qr', '/qrcode'], function(req, res) {
@@ -334,4 +340,4 @@ app.get('/:room?', function(req, res) {
 
 // Serve static files /static
 app.use('/static', express.static('www'));
-
+app.use('/media', express.static(process.env.VIDEO_PATH));
