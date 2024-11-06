@@ -48,7 +48,7 @@ var playlist = fs.readdirSync(process.env.VIDEO_PATH).filter((f) => f.endsWith('
 fs.watch(process.env.VIDEO_PATH, (eventType, filename) => {
   playlist = fs.readdirSync(process.env.VIDEO_PATH).filter((f) => f.endsWith('.mp4'));
   io.emit('playlist', playlist);
-  console.log('playlist', playlist);
+  //console.log('playlist', playlist);
 })
 
 // SYNC Server
@@ -130,7 +130,7 @@ io.on('connection', (socket) =>
     updateDevices(room);
     socket.emit('state', state[room])
     socket.emit('playlist', playlist)
-    console.log('hi', uuid, room, reso, playlist);
+//    console.log('hi', uuid, room, reso, playlist);
 
     // if new, try to move to a dead guest
     if (devices[room][uuid].mode === 'new') {
