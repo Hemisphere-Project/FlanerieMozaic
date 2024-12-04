@@ -86,6 +86,6 @@ POST-KXKM-OKTOBER
 - * Sync room (on every start: reset all time offset, on play Playlist, triggers playlist on all)
 - ** control : device not movable // controllable if not selected (on regie AND on client device)
 - 
-
+- Backup / Restore JSON
 
 
