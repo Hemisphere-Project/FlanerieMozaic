@@ -42,7 +42,9 @@ if (!state['default'])
 
 // PLAYLIST from list of files in /video
 //
+console.log("Loading playlist from: ", process.env.VIDEO_PATH)
 var playlist = fs.readdirSync(process.env.VIDEO_PATH).filter((f) => f.endsWith('.mp4'));
+console.log('playlist', playlist);
 
 // watch for changes in /video
 fs.watch(process.env.VIDEO_PATH, (eventType, filename) => {

@@ -27,3 +27,6 @@ node server.js
 - Control interface: http://[server-ip]:3000/control
 - To control a specific room (or group): http://[server-ip]:3000/[room-name]/control
 
+
+# PM2 allow port 80
+https://pm2.keymetrics.io/docs/usage/specifics/#listening-on-port-80-w-o-root
