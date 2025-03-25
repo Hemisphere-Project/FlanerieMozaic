@@ -125,7 +125,7 @@ class DevicePool {
         console.log('update', data[this.room])   
 
         for (let uuid in data[this.room]) 
-            if (uuid != 0)
+            if (uuid != 0 && uuid != -1)
             {
                 // console.log('update', uuid, data[this.room][uuid])
                 if (!this.devices[uuid]) this.devices[uuid] = new Device(uuid, this.room, this.player)

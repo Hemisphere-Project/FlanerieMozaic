@@ -6,16 +6,20 @@ class VideoPlayer {
         this.uuid = uuid
         this.container = $(container);
 
-        this.backstage = $('<div class="backstage draggable"></div>').appendTo(this.container);
-        this.backstage.attr('uuid', uuid)
+        if (uuid >= 0) {
+            this.backstage = $('<div class="backstage draggable"></div>').appendTo(this.container);
+            this.backstage.attr('uuid', uuid)
+            
+            this.stage = $('<div class="stage draggable"></div>').appendTo(this.backstage);
+            this.stage.attr('uuid', uuid)
+            this.stagescale = 1.0
+            this.stageoffset = {x: 0, y: 0}
+            this.scaleStage(1.0)
+
+            this.video = $('<video class="player draggable" loop playsinline></video>').appendTo(this.stage);
+        }
+        else this.video = $('<video class="player draggable" loop playsinline></video>').appendTo(this.container);
         
-        this.stage = $('<div class="stage draggable"></div>').appendTo(this.backstage);
-        this.stage.attr('uuid', uuid)
-        this.stagescale = 1.0
-        this.stageoffset = {x: 0, y: 0}
-        this.scaleStage(1.0)
-        
-        this.video = $('<video class="player draggable" loop playsinline></video>').appendTo(this.stage);
         this.video.attr('uuid', uuid)
         this._globalzoom = 1.0
         this._localzoom = 1.0

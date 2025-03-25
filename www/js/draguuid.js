@@ -9,6 +9,7 @@ function draggable(element) {
     element.addClass('draggable')
     element.off('touchstart mousedown')
     element.on('touchstart mousedown', (e)=>{
+        if (!element.hasClass('draggable')) return  // check if still has draggable class
         if (dragUUID != -1) return
         dragUUID = $(e.target).attr('uuid')
         element.addClass('dragging')

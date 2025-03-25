@@ -36,6 +36,9 @@ var room = urlParams.get('room') || window.location.pathname.split('#')[0].split
 if (!room) room = 'default'
 console.log('room', room)
 
+// set page title to room name
+document.title = room + ' :: ' + uuid
+
 // PLAYER
 var player = new SyncPlayer( socket, uuid, 'body' )
 
@@ -52,14 +55,26 @@ socket.on('devices', (data) => {
 
 socket.on('ctrls', (data) => {
     console.log('ctrls', data)
-    if (data) $('#controls').show()
-    else $('#controls').hide()
+    if (data) {
+        $('#controls').show()
+        $('.player').addClass('draggable')
+    }
+    else {
+        $('#controls').hide()
+        $('.player').removeClass('draggable')
+    }
 })
 
 socket.on('state', (data, from) => {
     console.log('state', data, from)
-    if (data.ctrls) $('#controls').show()
-    else $('#controls').hide()
+    if (data.ctrls) {
+        $('#controls').show()
+        $('.player').addClass('draggable')
+    }
+    else {
+        $('#controls').hide()
+        $('.player').removeClass('draggable')
+    }
 })
 
 socket.on('select', (uuid, selected) => {
@@ -107,9 +122,10 @@ player.video.on('drag', (e, delta) => {
     socket.emit('move', uuid, room, delta)
 })
 
-player.backstage.on('drag', (e, delta) => {
-    socket.emit('move', uuid, room, delta)
-})
+if (player.backstage)
+    player.backstage.on('drag', (e, delta) => {
+        socket.emit('move', uuid, room, delta)
+    })
 
 // ORIENTATION / RESOLUTION CHANGE
 //
@@ -126,7 +142,6 @@ $(window).on('orientationchange resize ready', updateSize)
 
 // SCROLL TO SCALE #player
 //
-
 // window.addEventListener("wheel", event => {
 //     const sign = Math.sign(event.deltaY);
 //     let s = Math.max(0.1, player.videoscale - sign * 0.1);
@@ -136,9 +151,10 @@ $(window).on('orientationchange resize ready', updateSize)
 
 // DOUBLE CLICK MENU
 //
-$(window).on('dblclick', () => {
-    $('#controls').toggle()
-})
+// $(window).on('dblclick', () => {
+//     $('#controls').toggle()
+//     $('.player').toggleClass('draggable')
+// })
 $('#controls').on('dblclick', (e) => {
     e.stopPropagation()
 })

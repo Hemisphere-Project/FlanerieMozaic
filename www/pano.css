@@ -93,10 +93,10 @@ a {
     left: 0;
     width: 220px;
     max-height: 95%;
-    padding: 15px;
+    padding: 10px;
     margin: 5px;
     box-sizing: border-box;
-    border: 1px solid red;
+    border: 1px solid #ccc;
     z-index: 90;
     background-color: rgba(50, 50, 50, 0.8);
     font-size: 16px;
@@ -104,6 +104,23 @@ a {
     overflow-y: auto;
     overflow-x: hidden;
 }
+
+#controls h2 {
+    font-size: 25px;
+    margin: 0;
+    padding: 5px;
+    background-color: #888;
+    color: black;
+}
+
+#controls h3 {
+    font-size: 18px;
+    margin: 0;
+    padding: 0 5px;
+    background-color: #666;
+    color: black;
+}
+
 
 #controls > svg.feather {
     width: 30px;
@@ -122,6 +139,7 @@ a {
     display: none;
 }
 
+
 #playlist {
     /* display: none; */
 }
@@ -135,6 +153,10 @@ a {
     font-size: 17px;
     padding: 5px;
     margin-top: 5px;
+}
+
+.btn-fullwidth {
+    width: 100%;
 }
 
 #uuid {
@@ -166,6 +188,16 @@ a {
     /* object-fit: fill; */
 }
 
+.miniplayer {
+    width: 100%;
+    /* max-height: 120px; */
+}
+
+.miniplayer .player {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
 
 
 .player.mirrored {
@@ -224,4 +256,36 @@ a {
     height: 60px;
     width: 60px;
     margin-left: 10px;
+}
+
+
+/* Control Rooms */
+#rooms {
+    margin-left: 225px;
+}
+
+.room {
+    width: 250px;
+    float: left;
+    margin: 5px;
+    border: 1px solid #ccc;
+    padding: 10px;
+}
+
+.room h2 {
+    font-size: 25px;
+    margin: 0;
+    padding: 5px;
+    background-color: #888;
+    color: black;
+    cursor: pointer;
+}
+
+.room h2 a {
+    color: black;
+}
+
+.room ul {
+    list-style-type: none;
+    padding: 0;
 }

@@ -5,6 +5,9 @@ import { Server as IoServer } from "socket.io";
 import Conf from 'conf';
 import fs from 'fs';
 import 'dotenv/config'
+import path from 'path';
+import './media.js';
+import { playlist } from './media.js';
 
 if (!'PORT' in process.env) process.env.PORT = 5000;
 if (!'VIDEO_PATH' in process.env) process.env.VIDEO_PATH = './www/video';
@@ -36,22 +39,18 @@ var defaultState = {
   paused: false,
   ctrls: false
 }
+
+// DEFAULT ROOM
 var state = config.get('state', {});
 if (!state['default']) 
   state['default'] = Object.assign({}, defaultState );
 
-// PLAYLIST from list of files in /video
-//
-console.log("Loading playlist from: ", process.env.VIDEO_PATH)
-var playlist = fs.readdirSync(process.env.VIDEO_PATH).filter((f) => f.endsWith('.mp4'));
-console.log('playlist', playlist);
-
-// watch for changes in /video
-fs.watch(process.env.VIDEO_PATH, (eventType, filename) => {
-  playlist = fs.readdirSync(process.env.VIDEO_PATH).filter((f) => f.endsWith('.mp4'));
-  io.emit('playlist', playlist);
-  //console.log('playlist', playlist);
-})
+// DEFAULT MEDIA FOLDER
+var defaultMediaFolder = path.join(process.env.VIDEO_PATH, 'default');
+if (!fs.existsSync(defaultMediaFolder)) {
+  fs.mkdirSync(defaultMediaFolder);
+  console.log('Creating video folder: ', process.env.VIDEO_PATH);
+}
 
 // SYNC Server
 //
@@ -62,6 +61,8 @@ const getTimeFunction = () => {
 }
 
 const syncServer = new SyncServer(getTimeFunction);
+
+var GLOBAL_OFFSET_TIME = 0;
 
 // Devices
 //
@@ -115,10 +116,14 @@ io.on('connection', (socket) =>
     //console.log('user disconnected');
     if (socket.uuid && devices[socket.room]) {
       devices[socket.room][socket.uuid].alive = false;
-      if (socket.uuid.startsWith('guest')) devices[socket.room][socket.uuid].resolution = {x: 400, y: 800};
+      if (socket.uuid == -1 || socket.uuid.startsWith('guest')) devices[socket.room][socket.uuid].resolution = {x: 400, y: 800};
       updateDevices(socket.room);
     }
   });
+
+  //
+  // PER-ROOM commands
+  //
 
   // Client is ready to receive initial data
   socket.on('hi', (uuid, room, reso) => 
@@ -131,8 +136,7 @@ io.on('connection', (socket) =>
     bootstrapDevice(uuid, room, reso);
     updateDevices(room);
     socket.emit('state', state[room])
-    socket.emit('playlist', playlist)
-//    console.log('hi', uuid, room, reso, playlist);
+    socket.emit('playlist', playlist(room));
 
     // if new, try to move to a dead guest
     if (devices[room][uuid].mode === 'new') {
@@ -143,7 +147,6 @@ io.on('connection', (socket) =>
         }
       }
     }
-
   })
   
   // Global zoom
@@ -281,9 +284,12 @@ io.on('connection', (socket) =>
   // Load and play media
   socket.on('play', (room, media) => {
     if (room === undefined) room = 'default';
-
     state[room].offsetTime = getTimeFunction();
-    state[room].media = media;
+    if (media !== undefined) {
+      state[room].media = media;
+      state[room].lastmedia = media;
+    }
+    else state[room].media = state[room].lastmedia;
     state[room].paused = false;
     config.set('state', state);
     io.to(room).emit('state', state[room]);
@@ -309,6 +315,52 @@ io.on('connection', (socket) =>
   socket.on('reloadAll', (room) => {
     io.to(room).emit('reload', 'all');
   })
+  
+  socket.on('state?', (room) => {
+    socket.emit('state', state[room]);
+  })
+
+  //
+  // CROSS-ROOM
+  //
+
+  socket.on('getrooms', () => {
+    // answer is a list of 
+    // { room: 'room1', videos: ['video1', 'video2', ...], state }
+    let rooms = [];
+    for (let room in state) rooms.push({room: room, videos: playlist(room), state: state[room]});
+    socket.emit('rooms', rooms);
+  })
+
+  // Playsync all rooms
+  socket.on('playsync', () => {
+    
+    let offsetTime = getTimeFunction();
+    for (let room in state) {
+      state[room].media = state[room].lastmedia
+      state[room].offsetTime = offsetTime
+      state[room].paused = false;
+    }
+    config.set('state', state);
+    for (let room in state) io.to(room).emit('state', state[room]);
+  })
+
+  // Pausesync all rooms
+  socket.on('pausesync', () => {
+    for (let room in state) state[room].paused = true;
+    config.set('state', state);
+    io.emit('pause');
+  })
+
+  // Stopsync all rooms
+  socket.on('stopsync', () => {
+    for (let room in state) {
+      state[room].media = '';
+      state[room].paused = false;
+    }
+    config.set('state', state);
+    io.emit('stop');
+  })
 
   // SYNC Server - client init
   syncServer.start( 
@@ -333,8 +385,12 @@ app.get(['/qr', '/qrcode'], function(req, res) {
   res.sendFile(__dirname + '/www/qr.html');
 });
 
-app.get('/control/:room?', function(req, res) {
+app.get('/mapping/:room?', function(req, res) {
   res.sendFile(__dirname + '/www/mapping.html');
+});
+
+app.get('/control', function(req, res) {
+  res.sendFile(__dirname + '/www/control.html');
 });
 
 app.get('/:room?', function(req, res) {

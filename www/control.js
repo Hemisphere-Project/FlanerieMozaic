@@ -1,191 +1,68 @@
-
-// // Browserified + Babelified version of https://github.com/chrisguttandin/timing-provider
-// // Connecting to local server https://github.com/chrisguttandin/timing-provider-server
-// const timingProvider = new TimingProvider('ws://10.2.8.99:4567');  
-// // timing object
-// var to = new TIMINGSRC.TimingObject({provider:timingProvider});
-
-// // set up video sync
-// var sync1 = MCorp.mediaSync(document.getElementById('player1'), to);
-
-// // set up video sync
-// var sync2 = MCorp.mediaSync(document.getElementById('player2'), to);
-
-
-// CONTROL PAGE
-feather.replace();
-
-//UUID
-const uuid = 0;
-
 // SocketIO
 //
 const socket = io()
 
-// Get ROOM from URL
-var room = window.location.pathname.split('/').pop()
-if (!room || room == 'control') room = 'default'
-console.log('room', room)
+var ROOMS = []
 
-// Players
-//
-var player = new SyncPlayer( socket, uuid, 'body' )
-var devices = new DevicePool( room, player )
-
-var touchStart = null
-
-// INIT 
-player.scaleStage(0.5)
-player.moveStage({x: 220, y: 100})
-
-
-socket.on('hello', () => {
-    console.log('================ hello ================')
-    socket.emit('hi', uuid, room, {x: window.innerWidth, y: window.innerHeight})
-});
-
-socket.on('zoom', (data) => {
-   player.globalzoom(data)
+socket.on('connect', () => {
+    socket.emit('getrooms')
 })
 
-socket.on('devices', (data) => {
-    devices.update(data)
-})
+// Rooms list
+socket.on('rooms', (data) => {
+    $('#rooms').empty()
 
-socket.on('playlist', (data) => {
-    // Create button for each video
-    $('#playlist').empty()
-    data.forEach((v) => {
-        $('#playlist').append(`<button class="btn" onclick="socket.emit('play', '${room}', '${v}')">${v}</button><br />`)
-    })
-})
+    // clear previous rooms
+    // TODO
 
-$('#zoomPlus').click(() => {    
-    socket.emit('zoom', room, player.videoscale + 0.1)
-})
+    ROOMS = data
 
-$('#zoomMinus').click(() => {
-    socket.emit('zoom', room, Math.max(0.1, player.videoscale - 0.1))
-})
+    for(let k in ROOMS) 
+    {
+        let room = ROOMS[k]
 
-$("#ctrls").click((e) => {
-    socket.emit('toggleCtrls', room)
-})
+        ROOMS[k].socket = io('/', {'force new connection': true})
+        ROOMS[k].socket.on('hello', () => {
+            console.log(`================ hello : ${room.room} ================`)
+            ROOMS[k].socket.emit('hi', -1, room.room, {x: window.innerWidth, y: window.innerHeight})
+        });  
 
-$('#clear').click(() => {
-    if (!confirm('Clear all inactive devices?')) return
-    socket.emit('clearDevices', room)
-})
+        let rdiv = $('<div>').addClass('room').appendTo('#rooms')
+        $('<h2>').text(room.room).appendTo(rdiv).on('click', () => { window.open('/mapping/'+room.room) })
+        $('<br />').appendTo(rdiv)
+        
+        // Miniplayer
+        let playerDiv = $('<div>').addClass('miniplayer').appendTo(rdiv)
+        ROOMS[k].player = new SyncPlayer( ROOMS[k].socket, -1, playerDiv )
 
-$('#alive').click(() => {
-    $('.device').not('.alive').toggle()
-})
-
-$('#pause').click(() => {
-    socket.emit('pause', room)
-})
-
-$('#stop').click(() => {
-    socket.emit('stop', room)
-})
-
-$('#camera').click(() => {
-    socket.emit('play', room, '#camera')
-})
-
-$('#mediaBtn').click(() => {
-    $('#playlist').toggle()
-})
-
-$('#guest').click(() => {
-    socket.emit('guestAdd', room)
-})
-
-// change href
-document.getElementById('browser_link').href = window.location.protocol + "//" + window.location.hostname + ":8080/";
-
-// DRAG VIDEO -> MOVE ALL DEVICES
-// player.video.on('drag', (e, delta) => {
-//     // socket.emit('move', uuid, delta)
-//     socket.emit('moveAll', room, delta)
-
-//     delta = {x: delta.x*player.stagescale, y: delta.y*player.stagescale}
-//     player.moveStage(delta)
-// })
-
-// DOUBLE CLICK VIDEO => SELECT ALL DEVICES
-// player.video.on('dblclick', (e) => {
-//     devices.toggleSel()
-// })
-
-// CATCH DBLC CLICK #controls
-$('#controls').on('dblclick', (e) => {
-    e.stopPropagation()
-})
-
-// DRAG VIDEO -> DRAG STAGE
-player.video.on('drag', (e, delta) => {
-    player.moveStage(delta)
-})
-
-// DOUBLE CLICK STAGE => SELECT ALL DEVICES
-player.backstage.on('dblclick', (e) => {
-    devices.toggleSel()
-})
-
-// DRAG STAGE
-player.backstage.on('drag', (e, delta) => {
-    player.moveStage(delta)
-})
-
-// SCROLL TO SCALE STAGE
-window.addEventListener("wheel", event => {
-    const sign = Math.sign(event.deltaY);
-    let s = Math.max(0.1, player.stagescale - sign * 0.1);
-    player.scaleStage(s)
-    // console.log(stagescale)
-});
-
-document.getElementById('controls').addEventListener('wheel', (e) => {
-    e.stopPropagation()
+        // Playlist
+        let ul = $('<ul>').appendTo(rdiv)
+        for(let v of room.videos) {
+            let li = $('<li>').appendTo(ul)
+            $('<button>').text(v).addClass('btn btn-fullwidth')
+                .appendTo(li).click(() => {
+                    socket.emit('play', room.room, v)
+                })
+        }
+    }
 })
 
 
-// CONTROLS / INFO
-//
-
-// RELOAD
-$('#reloadAll').click(() => {
-    if (!confirm('Reload all devices?')) return
-    socket.emit('reloadAll', room)
+// CONTROLS
+$('#playsync').click(() => {
+    socket.emit('playsync')
 })
 
-// SELECT
-$('#selectAll').click(() => {
-    devices.toggleSel()
+$('#stopsync').click(() => {
+    socket.emit('stopsync')
 })
 
 
-// KEYBOARD CONTROL
-//
-
-// arrow key to move
-$('body').on('keydown', (e)=>{
-    var deltaPos = {x: 0, y: 0}
-    if (e.key == 'ArrowUp') deltaPos.y = -1
-    if (e.key == 'ArrowDown') deltaPos.y = 1
-    if (e.key == 'ArrowLeft') deltaPos.x = -1
-    if (e.key == 'ArrowRight') deltaPos.x = 1
-    if (deltaPos.x || deltaPos.y)
-        $('.selected').each((i, e) => {
-            $(e).triggerHandler('drag', deltaPos)
-        })
-
-    var deltaZoom = 0
-    if (e.key == '+') deltaZoom = 0.01
-    if (e.key == '-') deltaZoom = -0.01
-    if (deltaZoom)
-        $('.selected').each((i, e) => {
-            $(e).triggerHandler('zoomdelta', deltaZoom)
-        })
+// LAUNCH INIT
+var FIRST_CLICK = true
+$('body').click(() => {
+    if (FIRST_CLICK) {
+        FIRST_CLICK = false
+        for (let k in ROOMS) ROOMS[k].socket.emit('state?', ROOMS[k].room)
+    }
 })
