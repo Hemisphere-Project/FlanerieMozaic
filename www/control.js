@@ -5,7 +5,7 @@ const socket = io()
 var ROOMS = []
 
 socket.on('connect', () => {
-    socket.emit('getrooms')
+    socket.emit('rooms?')
 })
 
 // Rooms list
@@ -41,7 +41,7 @@ socket.on('rooms', (data) => {
             let li = $('<li>').appendTo(ul)
             $('<button>').text(v).addClass('btn btn-fullwidth')
                 .appendTo(li).click(() => {
-                    socket.emit('play', room.room, v)
+                    socket.emit('play', v)
                 })
         }
     }
@@ -63,6 +63,6 @@ var FIRST_CLICK = true
 $('body').click(() => {
     if (FIRST_CLICK) {
         FIRST_CLICK = false
-        for (let k in ROOMS) ROOMS[k].socket.emit('state?', ROOMS[k].room)
+        for (let k in ROOMS) ROOMS[k].socket.emit('state?')
     }
 })

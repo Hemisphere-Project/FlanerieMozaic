@@ -27,12 +27,12 @@ class Device {
         // Drag
         this.dom.on('drag', (e, delta) => {
             let d = {x: -1*delta.x/player.stagescale, y: -1*delta.y/player.stagescale}
-            socket.emit('move', uuid, room, d)
+            socket.emit('move', d, this.uuid)
         })
 
         // Zoom
         this.dom.on('zoomdelta', (e, delta) => {
-            socket.emit('zoomdevice', room, this.uuid, Math.max(0.1, this.zoomdevice + delta))
+            socket.emit('deviceconf', 'zoomdevice', Math.max(0.1, this.zoomdevice + delta), this.uuid)
         })
 
         // device controls
@@ -41,7 +41,7 @@ class Device {
         // uuid
         $('<input type="text" value="'+uuid+'"></input>').appendTo(controls).on('change', (e) => {
             let newuuid = $(e.target).val()
-            socket.emit('rename', this.room, this.uuid, newuuid)
+            socket.emit('rename', this.uuid, newuuid)
         })
         
         // mode select
@@ -52,7 +52,7 @@ class Device {
         mode.append('<option value="guest">guest</option>')
         mode.on('change', (e) => {
             let newmode = $(e.target).val()
-            socket.emit('mode', this.room, this.uuid, newmode)
+            socket.emit('deviceconf', 'mode', newmode, this.uuid)
         })
         $(controls).append('<br><br>')
 
@@ -68,7 +68,7 @@ class Device {
         // remove
         $(controls).append('<br><br>')
         $('<button class="btnRem">remove</button>').appendTo(controls).on('click', () => {
-            socket.emit('remove', room, this.uuid)
+            socket.emit('remove', this.uuid)
         })
         
     }
@@ -107,7 +107,7 @@ class Device {
         this.selected = s
         if (this.selected) this.dom.addClass('selected')
         else this.dom.removeClass('selected')
-        socket.emit('select', this.room, this.uuid, this.selected)
+        socket.emit('select', this.selected)
     }
 }        
 
@@ -121,19 +121,19 @@ class DevicePool {
 
     update(data) 
     {
-        if (!data[this.room]) return
-        console.log('update', data[this.room])   
+        if (!data) return
+        console.log('update', data)   
 
-        for (let uuid in data[this.room]) 
+        for (let uuid in data) 
             if (uuid != 0 && uuid != -1)
             {
-                // console.log('update', uuid, data[this.room][uuid])
+                // console.log('update', uuid, data[uuid])
                 if (!this.devices[uuid]) this.devices[uuid] = new Device(uuid, this.room, this.player)
-                this.devices[uuid].update(data[this.room][uuid])
+                this.devices[uuid].update(data[uuid])
             }
 
         for (let uuid in this.devices)
-            if (!data[this.room][uuid]) this.remove(uuid)
+            if (!data[uuid]) this.remove(uuid)
     }
 
     remove(uuid) {

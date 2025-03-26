@@ -1,0 +1,32 @@
+{
+  "rooms": {
+    "screen1": {
+      "state": {
+        "offsetTime": 4.986697555,
+        "media": "0_small.mp4",
+        "lastmedia": null,
+        "mediainfo": {},
+        "paused": false,
+        "ctrls": true
+      },
+      "devices": {
+        "super": {
+          "position": {
+            "x": -2,
+            "y": 0
+          },
+          "resolution": {
+            "x": 628,
+            "y": 920
+          },
+          "zoomdevice": 1,
+          "alive": true,
+          "selected": false,
+          "mode": "new"
+        }
+      },
+      "random": 0.15573521424568315
+    }
+  },
+  "random": 0.052439042309492034
+}

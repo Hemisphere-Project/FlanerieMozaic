@@ -60,7 +60,6 @@ ERASME
 - Regie : move au clavier
 - Zoom / device (dpi)
 - Timeoffset / device ? (optional)
-- Dbltap : show/hide ctrl
 - Pi4 player 
 
 ***********
@@ -82,8 +81,8 @@ POST-KXKM-OKTOBER
 - ** Upload HD -> Create SD version -> Create fragments
 - ** Stage: Offset position and zoom per video (instead of global), layout still global
 - * Pre-Loading time: length ? Cache ? Storage PWA ... ?
-- Playlist: Créer une liste, boucle ou pas, load per video settings (offset / zoom)
-- * Sync room (on every start: reset all time offset, on play Playlist, triggers playlist on all)
+- * Playlist: Créer une liste, boucle ou pas, load per video settings (offset / zoom)
+x * Sync room (on every start: reset all time offset, on play Playlist, triggers playlist on all)
 - ** control : device not movable // controllable if not selected (on regie AND on client device)
 - 
 - Backup / Restore JSON

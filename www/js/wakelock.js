@@ -22,7 +22,7 @@ function wakeLock()
 
             // listen for our release event
             wakeLock.onrelease = function(ev) {
-                console.log(ev);
+                // console.log(ev);
             }
 
             $("#wakeLock").text('OK');

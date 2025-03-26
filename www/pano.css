@@ -144,6 +144,19 @@ a {
     /* display: none; */
 }
 
+#medianame {
+    font-size: 15px;
+    color: #eee;
+    font-style: italic;
+    float: right;
+
+    /* ellipsis */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+}   
+
 
 
 .btn {
@@ -176,6 +189,18 @@ a {
     /* background-color: blue; */
 }
 
+/* make a vertical cross at origin of parent div, 10px x 10px */
+.origin {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 10px;
+    height: 10px;
+    border: 1px solid red;
+    background-color: red;
+    z-index: 100;
+}
+
 .player {
     position: absolute;
     top: 0;
@@ -204,6 +229,7 @@ a {
     transform: scaleX(-1);
 }
 
+#panSlider,
 #zoomSlider {
     float:right;
 }

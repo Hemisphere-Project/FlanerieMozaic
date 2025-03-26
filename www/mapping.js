@@ -15,8 +15,14 @@
 // CONTROL PAGE
 feather.replace();
 
+// URL PARAMS
+const urlParams = new URLSearchParams(window.location.search);
+
 //UUID
-const uuid = 0;
+var UUID = '_mapping-'+Math.random().toString(36).substring(2, 15)
+
+// ACTIVEMEDIA
+var ACTIVEMEDIA = null
 
 // SocketIO
 //
@@ -33,7 +39,7 @@ $('#roomname').text(room)
 
 // Players
 //
-var player = new SyncPlayer( socket, uuid, 'body' )
+var player = new SyncPlayer( socket, UUID, 'body' )
 var devices = new DevicePool( room, player )
 
 var touchStart = null
@@ -45,40 +51,74 @@ player.moveStage({x: 220, y: 100})
 
 socket.on('hello', () => {
     console.log('================ hello ================')
-    socket.emit('hi', uuid, room, {x: window.innerWidth, y: window.innerHeight})
+    socket.emit('hi', UUID, room, {x: window.innerWidth, y: window.innerHeight})
 });
 
-socket.on('zoom', (data) => {
-   player.globalzoom(data)
-})
+// socket.on('zoom', (data) => {
+//    player.globalzoom(data)
+// })
 
 socket.on('devices', (data) => {
+    console.log('devices', data)
     devices.update(data)
 })
 
 socket.on('playlist', (data) => {
+    console.log('playlist', data)
     // Create button for each video
     $('#playlist').empty()
     data.forEach((v) => {
-        $('#playlist').append(`<button class="btn btn-fullwidth" onclick="socket.emit('play', '${room}', '${v}')">${v}</button><br />`)
+        $('#playlist').append(`<button class="btn btn-fullwidth" onclick="socket.emit('play', '${v}')">${v}</button><br />`)
     })
 })
 
+socket.on('state', (data) => {
+    ACTIVEMEDIA = {media: (data.media != '') ? data.media : data.lastmedia, mediainfo: data.mediainfo}
+    $('#medianame').text(ACTIVEMEDIA.media)
+})
+
 $('#zoomPlus').click(() => {    
-    socket.emit('zoom', room, player.videoscale + 0.1)
+    if (ACTIVEMEDIA)
+        socket.emit('mediaconf', ACTIVEMEDIA.media, 'zoom', ACTIVEMEDIA.mediainfo.zoom + 0.1)
 })
 
 $('#zoomMinus').click(() => {
-    socket.emit('zoom', room, Math.max(0.1, player.videoscale - 0.1))
+    if (ACTIVEMEDIA)
+        socket.emit('mediaconf', ACTIVEMEDIA.media, 'zoom', Math.max(0.1, ACTIVEMEDIA.mediainfo.zoom - 0.1))
+})
+
+$('#panLeft').click(() => {
+    if (ACTIVEMEDIA)
+        socket.emit('mediaconf', ACTIVEMEDIA.media, 'offset', {x: ACTIVEMEDIA.mediainfo.offset.x - 10, y: ACTIVEMEDIA.mediainfo.offset.y})
+})
+
+$('#panRight').click(() => {
+    if (ACTIVEMEDIA)
+        socket.emit('mediaconf', ACTIVEMEDIA.media, 'offset', {x: ACTIVEMEDIA.mediainfo.offset.x + 10, y: ACTIVEMEDIA.mediainfo.offset.y})
+})
+
+$('#panUp').click(() => {
+    if (ACTIVEMEDIA)
+        socket.emit('mediaconf', ACTIVEMEDIA.media, 'offset', {x: ACTIVEMEDIA.mediainfo.offset.x, y: ACTIVEMEDIA.mediainfo.offset.y - 10})
+})
+
+$('#panDown').click(() => {
+    if (ACTIVEMEDIA)
+        socket.emit('mediaconf', ACTIVEMEDIA.media, 'offset', {x: ACTIVEMEDIA.mediainfo.offset.x, y: ACTIVEMEDIA.mediainfo.offset.y + 10})
+})
+
+$('#panReset').click(() => {
+    if (ACTIVEMEDIA)
+        socket.emit('mediaconf', ACTIVEMEDIA.media, 'offset', {x: 0, y: 0})
 })
 
 $("#ctrls").click((e) => {
-    socket.emit('toggleCtrls', room)
+    socket.emit('toggleCtrls')
 })
 
 $('#clear').click(() => {
     if (!confirm('Clear all inactive devices?')) return
-    socket.emit('clearDevices', room)
+    socket.emit('clearDevices')
 })
 
 $('#alive').click(() => {
@@ -86,15 +126,15 @@ $('#alive').click(() => {
 })
 
 $('#pause').click(() => {
-    socket.emit('pause', room)
+    socket.emit('pause')
 })
 
 $('#stop').click(() => {
-    socket.emit('stop', room)
+    socket.emit('stop')
 })
 
 $('#camera').click(() => {
-    socket.emit('play', room, '#camera')
+    socket.emit('play', '#camera')
 })
 
 $('#mediaBtn').click(() => {
@@ -102,7 +142,7 @@ $('#mediaBtn').click(() => {
 })
 
 $('#guest').click(() => {
-    socket.emit('guestAdd', room)
+    socket.emit('guestAdd')
 })
 
 // body click
@@ -110,7 +150,7 @@ var FIRST_CLICK = true
 $('body').click(() => {
     if (FIRST_CLICK) {
         FIRST_CLICK = false
-        socket.emit('state?', room)
+        socket.emit('state?')
         console.log('resume')
     }
 })
@@ -118,14 +158,14 @@ $('body').click(() => {
 // change href
 document.getElementById('browser_link').href = window.location.protocol + "//" + window.location.hostname + ":8080/";
 
-// DRAG VIDEO -> MOVE ALL DEVICES
-// player.video.on('drag', (e, delta) => {
-//     // socket.emit('move', uuid, delta)
-//     socket.emit('moveAll', room, delta)
+// DRAG VIDEO -> set media offset
+player.video.on('drag', (e, delta) => {
+    // socket.emit('move', delta, player.uuid)
+    // socket.emit('moveAll', delta)
 
-//     delta = {x: delta.x*player.stagescale, y: delta.y*player.stagescale}
-//     player.moveStage(delta)
-// })
+    // var pos = {x: player.videooffset.x + delta.x*player.stagescale, y: player.videooffset.y + delta.y*player.stagescale}
+
+})
 
 // DOUBLE CLICK VIDEO => SELECT ALL DEVICES
 // player.video.on('dblclick', (e) => {
@@ -171,7 +211,7 @@ document.getElementById('controls').addEventListener('wheel', (e) => {
 // RELOAD
 $('#reloadAll').click(() => {
     if (!confirm('Reload all devices?')) return
-    socket.emit('reloadAll', room)
+    socket.emit('reloadAll')
 })
 
 // SELECT

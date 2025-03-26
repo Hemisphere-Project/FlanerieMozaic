@@ -6,7 +6,7 @@ class VideoPlayer {
         this.uuid = uuid
         this.container = $(container);
 
-        if (uuid >= 0) {
+        if (!uuid.startsWith('_control')) {
             this.backstage = $('<div class="backstage draggable"></div>').appendTo(this.container);
             this.backstage.attr('uuid', uuid)
             
@@ -16,16 +16,22 @@ class VideoPlayer {
             this.stageoffset = {x: 0, y: 0}
             this.scaleStage(1.0)
 
+            // add origin cross to stage
+            this.origin = $('<div class="origin"></div>').appendTo(this.stage)
+
             this.video = $('<video class="player draggable" loop playsinline></video>').appendTo(this.stage);
         }
         else this.video = $('<video class="player draggable" loop playsinline></video>').appendTo(this.container);
         
         this.video.attr('uuid', uuid)
+
         this._globalzoom = 1.0
         this._localzoom = 1.0
-        this.videoscale = 1.0
-        this.videooffset = {x: 0, y: 0}
-        this.position({x: 0, y: 0})
+
+        this._globalposition = {x: 0, y: 0}
+        this._localposition = {x: 0, y: 0}
+
+        this.globalposition({x: 0, y: 0})
         this.globalzoom(1.0)
 
         this.devicemode = 'new'
@@ -47,33 +53,49 @@ class VideoPlayer {
         this.stage.css('transform', 'scale('+this.stagescale+') translate('+this.stageoffset.x/this.stagescale+'px, '+this.stageoffset.y/this.stagescale+'px)')
     }
 
+    // video css
+    setvideocss() {
+        let scale = this._globalzoom * this._localzoom
+        let x = (this._localposition.x + this._globalposition.x) / scale
+        let y = (this._localposition.y + this._globalposition.y) / scale
+        this.video.css('transform', 'scale('+scale+') translate('+x+'px, '+y+'px)')
+    }
+        
+
     // global video zoom
     globalzoom(z) {
-         // console.log('zoom', z)
-         this._globalzoom = Math.max(0.1, z)
-         this.videoscale = this._globalzoom * this._localzoom
-         $('#zoom').text( Math.round(this._globalzoom*100) +"%")
-        this.video.css('transform', 'scale('+this.videoscale+') translate('+this.videooffset.x/this.videoscale+'px, '+this.videooffset.y/this.videoscale+'px)')
+        // console.log('zoom', z)
+        this._globalzoom = Math.max(0.1, z)
+        $('#zoom').text( Math.round(this._globalzoom*100) +"%")
+        this.setvideocss()
     }
 
     // local device zoom
     localzoom(z) {
         // console.log('zoom', z)
         this._localzoom = Math.max(0.1, z)
-        this.videoscale = this._globalzoom * this._localzoom
         $('#zoomdevice').text( Math.round(this._localzoom*100) +"%")
-        this.video.css('transform', 'scale('+this.videoscale+') translate('+this.videooffset.x/this.videoscale+'px, '+this.videooffset.y/this.videoscale+'px)')
+        this.setvideocss()
     }
 
-    // video position
-    position(pos) {
+    // global video position
+    globalposition(pos) {
         pos.x = Math.round(pos.x)
         pos.y = Math.round(pos.y)
+        this._globalposition = pos
+        // console.log('position', pos)
+        this.setvideocss()
+    }
+
+    // local video position
+    localposition(pos) {
+        pos.x = Math.round(pos.x)
+        pos.y = Math.round(pos.y)
+        this._localposition = pos
         // console.log('position', pos)
         $('#x').text(pos.x+" px")
         $('#y').text(pos.y+" px")
-        this.videooffset = pos
-        this.video.css('transform', 'scale('+this.videoscale+') translate('+this.videooffset.x/this.videoscale+'px, '+this.videooffset.y/this.videoscale+'px)')
+        this.setvideocss()
     }
 
     // mode
@@ -83,11 +105,11 @@ class VideoPlayer {
     }
 
     // update
-    updateConf(data) {
+    updateDevice(data) {
         console.log('UPDATE', data)
-        this.position(data.position)
-        this.mode(data.mode) 
+        this.localposition(data.position)
         this.localzoom(data.zoomdevice)
+        this.mode(data.mode) 
     }
 
     load(media) {
@@ -112,7 +134,7 @@ class VideoPlayer {
                 this.video[0].srcObject.getTracks().forEach(track => track.stop());
                 this.video[0].srcObject = null
             }
-            this.video.attr('src', '/media/'+media)
+            this.video.attr('src', '/media/'+room+'/'+media)
             this.video[0].load()
             this.video[0].pause()
         }

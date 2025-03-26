@@ -6,50 +6,73 @@ import Conf from 'conf';
 import fs from 'fs';
 import 'dotenv/config'
 import path from 'path';
-import './media.js';
-import { playlist } from './media.js';
+import MediaManager from './MediaManager.js';
+import LazyStorage from './LazyStorage.mjs';
+import { info } from 'console';
+const __dirname = new URL('.', import.meta.url).pathname;
 
 if (!'PORT' in process.env) process.env.PORT = 5000;
 if (!'VIDEO_PATH' in process.env) process.env.VIDEO_PATH = './www/video';
-
+if (!'STORE_FILE' in process.env) process.env.STORE_FILE = './torage/store.json';
 
 console.log("\n === Flanerie Mozaic Server === \n")
 
-const __dirname = new URL('.', import.meta.url).pathname;
-// const options={
-//   key:fs.readFileSync(path.join(__dirname,'./cert/key.pem')),
-//   cert:fs.readFileSync(path.join(__dirname,'./cert/cert.pem'))
-// }
+const STORE = LazyStorage(process.env.STORE_FILE);
+const MEDIA = MediaManager();
 
-const config = new Conf({projectName: 'panoptic'});
-// config.clear();
-
-console.log("Loading config from: ", config.path)
+console.log("Loading STORE from: ", process.env.STORE_FILE)
 
 var app = express();
 var server = HttpServer(app);
 var io = new IoServer(server);
 
-// STATE
-//
-var defaultState = {
-  zoom: 1.0,
+
+// DEFAULTS 
+const defaultState = {
   offsetTime: 0,
-  media: '',
+  media: null,
+  lastmedia: null,
+  mediainfo: {},
   paused: false,
-  ctrls: false
+  ctrls: false,
 }
 
-// DEFAULT ROOM
-var state = config.get('state', {});
-if (!state['default']) 
-  state['default'] = Object.assign({}, defaultState );
+const defaultDevice = {
+  position: {x: 0, y: 0},
+  resolution: {x: 400, y: 800},
+  zoomdevice: 1.0,
+  alive: false,
+  selected: false,
+  mode: 'new' // new, fixed, guest
+}
 
-// DEFAULT MEDIA FOLDER
-var defaultMediaFolder = path.join(process.env.VIDEO_PATH, 'default');
-if (!fs.existsSync(defaultMediaFolder)) {
-  fs.mkdirSync(defaultMediaFolder);
-  console.log('Creating video folder: ', process.env.VIDEO_PATH);
+// STORES
+var ROOMS = STORE.rooms;
+if (!ROOMS) ROOMS = STORE.rooms = {};
+
+function room(roomid) {
+  if (typeof roomid === 'object' && !Array.isArray(roomid) && roomid !== null && 'room' in roomid) roomid = roomid.room;  // allow to pass entire socket object
+  if (!roomid) roomid = 'default';
+  if (!STORE.rooms[roomid]) STORE.rooms[roomid] = {state: Object.assign({}, defaultState), devices: {}};
+  return STORE.rooms[roomid];
+}
+
+function roomstate(roomid) {
+  return room(roomid).state;
+}
+
+function roomdevices(roomid) {
+  return room(roomid).devices;
+}
+
+function device(uuid, roomid) {
+  if (uuid.startsWith('_')) return Object.assign({}, defaultDevice, {mode: 'control'});
+
+  console.log('device', uuid, roomid);
+  
+  var devices = roomdevices(roomid);
+  devices[uuid] = Object.assign({}, defaultDevice, devices[uuid]);
+  return devices[uuid];
 }
 
 // SYNC Server
@@ -59,66 +82,88 @@ const getTimeFunction = () => {
   const now = process.hrtime(startTime);
   return now[0] + now[1] * 1e-9;
 }
-
 const syncServer = new SyncServer(getTimeFunction);
 
-var GLOBAL_OFFSET_TIME = 0;
-
-// Devices
+// INIT Devices to default state
 //
-var devices = config.get('devices', { 'default': {} });
-for (let room in devices)
-  for (let uuid in devices[room]) {
-    devices[room][uuid].alive = false;
-    if (devices[room][uuid].mode.startsWith('guest')) 
-      devices[room][uuid].resolution = {x: 400, y: 800};
-    if (!devices[room][uuid].zoomdevice) devices[room][uuid].zoomdevice = 1.0;
+for (let room in STORE.rooms) {
+  for (const uuid in STORE.rooms[room].devices) {
+    let dev = device(uuid, room);
+    if (dev.mode.startsWith('guest')) dev.resolution = {x: 400, y: 800};
+    dev = Object.assign({}, defaultDevice, dev, {alive: false});
   }
-
-// console.log('devices', devices);
+}
 
 // Create a new device entry if it doesn't exist
 function bootstrapDevice(uuid, room, reso) {
   if (uuid === undefined) return;
   if (room === undefined) room = 'default';
 
-  if (!devices[room]) devices[room] = {}
-  if (!state[room]) state[room] = Object.assign({}, defaultState );
+  let dev = device(uuid, room);
 
-  devices[room][uuid] = devices[room][uuid] || {
-    room: 'default',
-    position: {x: 0, y: 0}, 
-    resolution: {x: 400, y: 800},
-    zoomdevice: 1.0,
-    alive: false,
-    selected: false,
-    mode: 'new' // new, fixed, guest
-  };
-  if (reso) devices[room][uuid].resolution = reso;
-  if (room) devices[room][uuid].room = room;
-  if (reso) devices[room][uuid].alive = true;
+  if (reso) {
+    dev.resolution = reso;
+    dev.alive = true;
+  }
+
+  return dev
 }
 
-// Save devices to config and emit to clients
-function updateDevices(room) {
-  config.set('devices', devices);
-  io.to(room).emit('devices', devices);
+// Send room state to all clients
+function infoState(roomid, targetid) {
+  roomid = roomid || 'default';
+  targetid = targetid || roomid;
+
+  let state = Object.assign({}, roomstate(roomid));
+  delete state.devices;
+
+  let media = state.media || state.lastmedia;
+  state.lastmedia = media;
+  state.mediainfo = media ? MEDIA.info(roomid, media) : {};
+
+  io.to(targetid).emit('state', state);
+  STORE._save();
 }
+
+// Send devices state to all clients
+function infoDevices(roomid, targetid) {
+  roomid = roomid || 'default';
+  targetid = targetid || roomid;
+  let devices = Object.assign({}, room(roomid).devices);
+  io.to(targetid).emit('devices', devices);
+  STORE._save();
+}
+
+function infoPlaylist(roomid, targetid) {
+  roomid = roomid || 'default';
+  targetid = targetid || roomid;
+  io.to(targetid).emit('playlist', MEDIA.playlist(roomid));
+  STORE._save();
+}
+
+// Check if socket is valid
+function checkSocket(socket) {
+  if (!('uuid' in socket) || !('room' in socket)) return false;
+  if (!(socket.room in STORE.rooms)) return false;
+  if (!(socket.uuid.startsWith('_')) && !(socket.uuid in roomdevices(socket))) return false;
+  return true;
+}
+
+
 
 
 // Socket.io Server
 //
 io.on('connection', (socket) => 
 {
-  //console.log('a user connected');
-
   socket.on('disconnect', () => {
-    //console.log('user disconnected');
-    if (socket.uuid && devices[socket.room]) {
-      devices[socket.room][socket.uuid].alive = false;
-      if (socket.uuid == -1 || socket.uuid.startsWith('guest')) devices[socket.room][socket.uuid].resolution = {x: 400, y: 800};
-      updateDevices(socket.room);
-    }
+    if (socket.uuid === -1 || socket.uuid === 0) return; // ignore controler / mapper
+    if (!checkSocket(socket)) return;
+    device(socket.uuid, socket.room).alive = false;
+    if (socket.uuid.startsWith('guest')) 
+      device(socket.uuid, socket.room).resolution = {x: 400, y: 800};
+    infoDevices(socket.room);
+    console.log('device disconnected');
   });
 
   //
@@ -133,232 +178,218 @@ io.on('connection', (socket) =>
     socket.uuid = uuid;
     socket.room = room;
     socket.join(room);
-    bootstrapDevice(uuid, room, reso);
-    updateDevices(room);
-    socket.emit('state', state[room])
-    socket.emit('playlist', playlist(room));
+    socket.join(uuid);
 
-    // if new, try to move to a dead guest
-    if (devices[room][uuid].mode === 'new') {
-      for (let guestid in devices[room]) {
-        if (devices[room][guestid].mode === 'guest' && !devices[room][guestid].alive) {
-          io.to(room).emit('rename', uuid, guestid);
-          break;
+    if (uuid.startsWith('_')) {
+      console.log('anonymous player connected');
+    }
+    else {
+      console.log('device connected', uuid, room);
+
+      let dev = bootstrapDevice(uuid, room, reso);
+      
+      // if new, try to move to a dead guest
+      if (dev.mode === 'new') {
+        for (let uuid in STORE.rooms[room].devices) {
+          if (device(uuid,room).mode === 'guest' && !device(uuid,room).alive) {
+            io.to(uuid).emit('setname', guestid);
+            break;
+          }
         }
       }
     }
+
+    infoDevices(room);
+    infoState(room, uuid);
+    infoPlaylist(room, uuid);
+  })
+
+  // Configure media
+  socket.on('mediaconf', (media, key, val) => {
+    if (!checkSocket(socket)) return;
+    MEDIA.configure(socket.room, media, key, val)
+    infoState(socket.room)
+  })
+
+  // Configure device
+  socket.on('deviceconf', (key, val, uuid) => {
+    if (!checkSocket(socket)) return;
+    uuid = uuid || socket.uuid;
+    bootstrapDevice(uuid, socket.room)[key] = val; 
+    infoDevices(socket.room);
   })
   
-  // Global zoom
-  socket.on('zoom', (room, z) => {
-    if (room === undefined) room = 'default';
-
-    state[room].zoom = z;
-    state[room].zoom = Math.max(0.1, state[room].zoom);
-    config.set('state', state);
-    io.to(room).emit('state', state[room]);
-  })
-
-  // Local zoom
-  socket.on('zoomdevice', (room, uuid, z) => {
-    if (room === undefined) room = 'default';
-    if (uuid === undefined) return;
-
-    bootstrapDevice(uuid, room);
-    devices[room][uuid].zoomdevice = z;
-    updateDevices(room);
-  })
-
   // Rename device
-  socket.on('rename', (room, uuid, newuuid) => {
-    if (room === undefined) room = 'default';
-    if (uuid === undefined) return;
+  socket.on('rename', (olduuid, newuuid) => {
+    if (!checkSocket(socket)) return;
+    if (olduuid === undefined) return;
     if (newuuid === undefined) return;
     
-    devices[room][newuuid] = devices[room][uuid];
-    io.to(room).emit('rename', uuid, newuuid);
+    let r = room(socket);    
+    r.devices[newuuid] = Object.assign({}, r.devices[olduuid]);
+    delete r.devices[olduuid];
+
+    io.to(olduuid).emit('setname', newuuid);
   })
 
   // Remove device
-  socket.on('remove', (room, uuid) => {
-    if (room === undefined) room = 'default';
+  socket.on('remove', (uuid) => {
+    if (!checkSocket(socket)) return;
     if (uuid === undefined) return;
-    if (devices[room][uuid]) {
-      if (uuid.startsWith('guest')) io.to(room).emit('reload', uuid);
-      delete devices[room][uuid];
-      updateDevices(room);
-    }
-  })
-
-  // Mode
-  socket.on('mode', (room, uuid, mode) => {
-    if (room === undefined) room = 'default';
-    if (uuid === undefined) return;
-    if (mode === undefined) return;
-
-    bootstrapDevice(uuid, room);
-    devices[room][uuid].mode = mode;
-    config.set('state', state);
-    updateDevices(room);
+    
+    if (uuid.startsWith('guest')) io.to(uuid).emit('reload');
+    delete room(socket).devices[uuid];
+    
+    infoDevices(socket.room);
   })
 
   // select device
-  socket.on('select', (room, uuid, selected) => {
-    io.to(room).emit('select', uuid, selected);
+  socket.on('select', (selected, uuid) => {
+    if (!checkSocket(socket)) return;
+    uuid = uuid || socket.uuid;
+    io.to(uuid).emit('select', selected);
   })
 
   // Add guest
-  socket.on('guestAdd', (room) => {
-    if (room === undefined) room = 'default';
+  socket.on('guestAdd', () => {
+    if (!checkSocket(socket)) return;
     
     var guestCount = 0;
-    for (let uuid in devices[room])
-      if (devices[room][uuid].mode === 'guest') guestCount++;
-    while (devices[room]['guest'+guestCount]) guestCount++;
+    for (let uuid in room(socket).devices)
+      if (room(socket).devices[uuid].mode === 'guest') guestCount++;
+    while (room(socket).devices['guest'+guestCount]) guestCount++;
+
     var uuid = "guest"+guestCount
-    bootstrapDevice(uuid, room, {x: 400, y: 800});
-    devices[room][uuid].alive = false;
-    devices[room][uuid].mode = 'guest';
-    updateDevices(room);
+    let dev = bootstrapDevice(uuid, socket.room, {x: 400, y: 800});
+    dev.mode = 'guest';
+    dev.alive = false;
+
+    infoDevices(socket.room);
   })
 
   // Move device
-  socket.on('move', (uuid, room, delta) => 
+  socket.on('move', (delta, uuid) => 
   {
-    if (uuid === undefined) return;
-    if (room === undefined) room = 'default';
-
-    bootstrapDevice(uuid, room);
-    devices[room][uuid].position.x += delta.x;
-    devices[room][uuid].position.y += delta.y;
-    updateDevices(room);
-    // console.log('move', uuid, room, delta, devices[room][uuid].position); 
+    if (!checkSocket(socket)) return;
+    uuid = uuid || socket.uuid;
+    console.log('move', uuid, socket.room, delta);
+    var dev = bootstrapDevice(uuid, socket.room);
+    dev.position.x += delta.x;
+    dev.position.y += delta.y;
+    // // console.log('move', uuid, socket.room, delta, devices[room][uuid].position); 
+    infoDevices(socket.room);
   })
 
   // Move all devices
-  socket.on('moveAll', (room, delta) => 
+  socket.on('moveAll', (delta) => 
   {
-    if (room === undefined) room = 'default';
-    if (!devices[room]) return;
-
-    for (let uuid in devices[room]) {
-      devices[room][uuid].position.x += delta.x;
-      devices[room][uuid].position.y += delta.y;
+    if (!checkSocket(socket)) return;
+    for (let uuid in room(socket).devices) {
+      let dev = device(uuid, socket);
+      dev.position.x += delta.x*dev.zoomdevice;
+      dev.position.y += delta.y*dev.zoomdevice;
     }
-    updateDevices(room);
-  })
-
-  // Set device position
-  socket.on('setPosition', (uuid, room, pos) => 
-  {
-    if (uuid === undefined) return;
-    if (room === undefined) room = 'default';
-
-    bootstrapDevice(uuid, room);
-    devices[room][uuid].position = pos;
-    updateDevices(room);
+    infoDevices(socket.room);
   })
 
   // Clear devices
-  socket.on('clearDevices', (room) => 
+  socket.on('clearDevices', () => 
   {
-    if (room === undefined) room = 'default';
-    if (!devices[room]) return;
-
-    for (let uuid in devices[room]) {
-      if (devices[room][uuid].alive) devices[room][uuid].alive = false;
-      else if (!uuid.startsWith('guest')) delete devices[room][uuid];
+    if (!checkSocket(socket)) return;
+    for (let uuid in room(socket).devices) {
+      let dev = device(uuid, socket);
+      if (dev.alive) dev.alive = false;
+      else if (!uuid.startsWith('guest')) delete room(socket).devices[uuid];
     }
-    updateDevices(room);
+    infoDevices(socket.room);
   })
 
   // Toggle controls
-  socket.on('toggleCtrls', (room) => 
+  socket.on('toggleCtrls', () => 
   {
-    if (room === undefined) room = 'default';
-    
-    state[room].ctrls = !state[room].ctrls;
-    io.to(room).emit('ctrls', state[room].ctrls);
+    if (!checkSocket(socket)) return;
+    roomstate(socket).ctrls = !roomstate(socket).ctrls
+    infoState(socket.room);
   })
 
   // Load and play media
-  socket.on('play', (room, media) => {
-    if (room === undefined) room = 'default';
-    state[room].offsetTime = getTimeFunction();
-    if (media !== undefined) {
-      state[room].media = media;
-      state[room].lastmedia = media;
-    }
-    else state[room].media = state[room].lastmedia;
-    state[room].paused = false;
-    config.set('state', state);
-    io.to(room).emit('state', state[room]);
+  socket.on('play', (media) => {
+    if (!checkSocket(socket)) return;
+    var state = roomstate(socket)
+    state.offsetTime = getTimeFunction();
+    if (media !== undefined) state.media = media;
+    else state.media = state.lastmedia;
+    state.paused = false;
+    infoState(socket.room);
   })
 
   // Stop media
-  socket.on('stop', (room) => {
-    if (room === undefined) room = 'default';
-    state[room].media = '';
-    state[room].paused = false;
-    config.set('state', state);
-    io.to(room).emit('stop');
+  socket.on('stop', () => {
+    if (!checkSocket(socket)) return;
+    roomstate(socket).media = null;
+    infoState(socket.room);
   })
 
   // Pause
-  socket.on('pause', (room) => {
-    if (room === undefined) room = 'default';
-    state[room].paused = !state[room].paused;
-    io.to(room).emit( state[room].paused ? 'pause' : 'play' );
+  socket.on('pause', () => {
+    if (!checkSocket(socket)) return;
+    roomstate(socket).paused = !roomstate(socket).paused;
+    infoState(socket.room);
   })
 
   // reloadAll
-  socket.on('reloadAll', (room) => {
-    io.to(room).emit('reload', 'all');
+  socket.on('reloadAll', () => {
+    if (!checkSocket(socket)) return;
+    io.to(socket.room).emit('reload');
   })
   
-  socket.on('state?', (room) => {
-    socket.emit('state', state[room]);
+  socket.on('state?', () => {
+    if (!checkSocket(socket)) return;
+    infoState(socket.room, socket.uuid);
+  })
+
+  socket.on('playlist?', () => {
+    if (!checkSocket(socket)) return;
+    infoPlaylist(socket.room, socket.uuid);
+  })
+
+  socket.on('devices?', () => {
+    if (!checkSocket(socket)) return;
+    infoDevices(socket.room, socket.uuid);
   })
 
   //
   // CROSS-ROOM
   //
 
-  socket.on('getrooms', () => {
+  socket.on('rooms?', () => {
     // answer is a list of 
-    // { room: 'room1', videos: ['video1', 'video2', ...], state }
+    // { room: 'room1', videos: ['video1', 'video2', ...] }
     let rooms = [];
-    for (let room in state) rooms.push({room: room, videos: playlist(room), state: state[room]});
+    for (let roomid in STORE.rooms) rooms.push({room: roomid, videos: MEDIA.playlist(roomid)});
     socket.emit('rooms', rooms);
   })
 
   // Playsync all rooms
   socket.on('playsync', () => {
-    
     let offsetTime = getTimeFunction();
-    for (let room in state) {
-      state[room].media = state[room].lastmedia
-      state[room].offsetTime = offsetTime
-      state[room].paused = false;
+    for (let roomid in STORE.rooms) {
+      roomstate(roomid).offsetTime = offsetTime;
+      roomstate(roomid).media = roomstate(roomid).lastmedia;
+      roomstate(roomid).paused = false;
+      infoState(roomid);
     }
-    config.set('state', state);
-    for (let room in state) io.to(room).emit('state', state[room]);
   })
 
   // Pausesync all rooms
   socket.on('pausesync', () => {
-    for (let room in state) state[room].paused = true;
-    config.set('state', state);
+    for (let roomid in STORE.rooms) room(roomid).paused = true;
     io.emit('pause');
   })
 
   // Stopsync all rooms
   socket.on('stopsync', () => {
-    for (let room in state) {
-      state[room].media = '';
-      state[room].paused = false;
-    }
-    config.set('state', state);
+    for (let roomid in STORE.rooms) roomstate(roomid).media = null;
     io.emit('stop');
   })
 

@@ -39,7 +39,10 @@ class SyncPlayer extends VideoPlayer {
       this.syncClient.start(
         (pingId, clientPingTime) => { this.socket.emit('ping', pingId, clientPingTime) },
         (callback) => { this.socket.on('pong', (...args) => { callback(...args) }) },
-        (status) => { console.log("status", status); this.synced = true; }
+        (status) => { 
+          this.synced = true; 
+          //console.log("status", status); 
+        }
       );
     })
 
@@ -50,16 +53,25 @@ class SyncPlayer extends VideoPlayer {
     })
 
     // State
-    this.socket.on('state', (data) => {
+    this.socket.on('state', (data) => 
+    {
       console.log('state', data)
-      this.globalzoom(data.zoom)
-      this.offsetTime = data.offsetTime
+
+      // this.globalzoom(data.zoom)
+      if (data.mediainfo) {
+        if (data.mediainfo.offset) this.globalposition(data.mediainfo.offset)
+        if (data.mediainfo.zoom) this.globalzoom(data.mediainfo.zoom)
+      }
+      
+        this.offsetTime = data.offsetTime
 
       if (data.media != this.media || data.paused != this.element.paused) {
         if (data.media == '') this.stop()
         else if(!data.paused) this.play(data.media)
         else this.load(data.media)
       }
+
+    
     })
 
     // media element
