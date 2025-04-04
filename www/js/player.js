@@ -1,8 +1,16 @@
-
-class VideoPlayer {
+class VideoPlayer extends EventEmitter {
     
     // constructor
-    constructor(uuid, container) {
+    constructor(uuid, container) 
+    {
+        super();
+
+        // state
+        this.media = '';
+        this.playing = false;
+        this.paused = false;
+        this.ended = false;
+
         this.uuid = uuid
         this.container = $(container);
 
@@ -19,11 +27,16 @@ class VideoPlayer {
             // add origin cross to stage
             this.origin = $('<div class="origin"></div>').appendTo(this.stage)
 
-            this.video = $('<video class="player draggable" loop playsinline></video>').appendTo(this.stage);
+            this.video = $('<video class="player draggable" playsinline></video>').appendTo(this.stage);
         }
-        else this.video = $('<video class="player draggable" loop playsinline></video>').appendTo(this.container);
+        else this.video = $('<video class="player draggable" playsinline></video>').appendTo(this.container);
         
         this.video.attr('uuid', uuid)
+
+        this.video.on('ended', () => {
+            this.stop(false)
+            this.emit('end')
+        })
 
         this._globalzoom = 1.0
         this._localzoom = 1.0
@@ -134,36 +147,46 @@ class VideoPlayer {
                 this.video[0].srcObject.getTracks().forEach(track => track.stop());
                 this.video[0].srcObject = null
             }
-            this.video.attr('src', '/media/'+room+'/'+media)
+            this.video.attr('src', '/media/'+media)
             this.video[0].load()
             this.video[0].pause()
         }
     }
 
     play(media) {
-        if (media) this.load(media)
+        if (media && media != this.media) this.load(media)
+        else if (this.media == '') return
         console.log('play!')
         // $('#logs').text('play! '+ media)
-        this.video[0].play()
+        this.video[0].currentTime = 0
         this.video[0].style.visibility = 'visible'
+        this.video[0].play()
+        this.playing = true
+        this.paused = false
     }
 
     pause() {
         console.log('pause!')
         this.video[0].pause()
+        this.paused = true
     }
 
-    stop() {
+    stop(hide=true) {
         console.log('stop')
-        this.video[0].style.visibility = 'hidden'
+        if (hide) this.video[0].style.visibility = 'hidden'
         this.video[0].pause()
         this.media = ''
         this.video[0].currentTime = 0
+        this.playing = false
+        this.paused = false
     }
 
     duration() {
         return this.video[0].duration
     }
-    
+
+    loop(loop) {
+        this.video[0].loop = loop
+    }
 
 }

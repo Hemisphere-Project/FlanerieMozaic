@@ -2,30 +2,58 @@
   "rooms": {
     "screen1": {
       "state": {
-        "offsetTime": 4.986697555,
-        "media": "0_small.mp4",
-        "lastmedia": null,
+        "offsetTime": 193.638819564,
+        "media": "",
+        "lastmedia": "screen1/_small.mp4",
         "mediainfo": {},
         "paused": false,
-        "ctrls": true
+        "ctrls": false,
+        "master": "_control-mfish63wmxl-0"
       },
       "devices": {
-        "super": {
+        "225oqeb7myl5l3jnalcqyc": {
           "position": {
-            "x": -2,
-            "y": 0
+            "x": 231,
+            "y": 153
           },
           "resolution": {
-            "x": 628,
-            "y": 920
+            "x": 1187,
+            "y": 1133
+          },
+          "zoomdevice": 1.3000000000000003,
+          "alive": false,
+          "selected": false,
+          "mode": "new"
+        }
+      },
+      "random": 0.15573521424568315
+    },
+    "default": {
+      "state": {
+        "offsetTime": 193.640217872,
+        "media": "",
+        "lastmedia": "default/mire.mp4",
+        "mediainfo": {},
+        "paused": false,
+        "ctrls": false,
+        "master": "_control-mfish63wmxl-1"
+      },
+      "devices": {
+        "225oqeb7myl5l3jnalcqyc": {
+          "position": {
+            "x": 260,
+            "y": 372
+          },
+          "resolution": {
+            "x": 1862,
+            "y": 1133
           },
           "zoomdevice": 1,
           "alive": true,
           "selected": false,
           "mode": "new"
         }
-      },
-      "random": 0.15573521424568315
+      }
     }
   },
   "random": 0.052439042309492034

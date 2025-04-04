@@ -67,9 +67,6 @@ function roomdevices(roomid) {
 
 function device(uuid, roomid) {
   if (uuid.startsWith('_')) return Object.assign({}, defaultDevice, {mode: 'control'});
-
-  console.log('device', uuid, roomid);
-  
   var devices = roomdevices(roomid);
   devices[uuid] = Object.assign({}, defaultDevice, devices[uuid]);
   return devices[uuid];
@@ -114,14 +111,18 @@ function infoState(roomid, targetid) {
   roomid = roomid || 'default';
   targetid = targetid || roomid;
 
-  let state = Object.assign({}, roomstate(roomid));
-  delete state.devices;
+  let state = roomstate(roomid);
 
   let media = state.media || state.lastmedia;
   state.lastmedia = media;
   state.mediainfo = media ? MEDIA.info(roomid, media) : {};
 
+  // send light state (without devices)
+  state = Object.assign({}, state);
+  delete state.devices; 
   io.to(targetid).emit('state', state);
+
+  // store modified state
   STORE._save();
 }
 
@@ -134,10 +135,10 @@ function infoDevices(roomid, targetid) {
   STORE._save();
 }
 
-function infoPlaylist(roomid, targetid) {
+function infoMedialist(roomid, targetid) {
   roomid = roomid || 'default';
   targetid = targetid || roomid;
-  io.to(targetid).emit('playlist', MEDIA.playlist(roomid));
+  io.to(targetid).emit('medialist', MEDIA.medialist(roomid));
   STORE._save();
 }
 
@@ -157,7 +158,15 @@ function checkSocket(socket) {
 io.on('connection', (socket) => 
 {
   socket.on('disconnect', () => {
-    if (socket.uuid === -1 || socket.uuid === 0) return; // ignore controler / mapper
+
+    // if socket.uuid is master of a room, stop that room
+    if (socket.uuid && socket.uuid === roomstate(socket.room).master) {
+      roomstate(socket.room).media = '';
+      infoState(socket.room);
+    }
+
+    if (!socket.uuid || socket.uuid.startsWith('_')) return; // ignore controler / mapper
+
     if (!checkSocket(socket)) return;
     device(socket.uuid, socket.room).alive = false;
     if (socket.uuid.startsWith('guest')) 
@@ -173,6 +182,13 @@ io.on('connection', (socket) =>
   // Client is ready to receive initial data
   socket.on('hi', (uuid, room, reso) => 
   {
+    uuid = String(uuid).trim();
+    if (uuid === '') {
+      console.error('uuid is undefined');
+      socket.emit('error', 'uuid is undefined');
+      return;
+    }
+
     if (room === undefined) room = 'default';
 
     socket.uuid = uuid;
@@ -201,7 +217,7 @@ io.on('connection', (socket) =>
 
     infoDevices(room);
     infoState(room, uuid);
-    infoPlaylist(room, uuid);
+    infoMedialist(room, uuid);
   })
 
   // Configure media
@@ -272,11 +288,10 @@ io.on('connection', (socket) =>
   {
     if (!checkSocket(socket)) return;
     uuid = uuid || socket.uuid;
-    console.log('move', uuid, socket.room, delta);
+    // console.log('move', uuid, socket.room, delta);
     var dev = bootstrapDevice(uuid, socket.room);
     dev.position.x += delta.x;
     dev.position.y += delta.y;
-    // // console.log('move', uuid, socket.room, delta, devices[room][uuid].position); 
     infoDevices(socket.room);
   })
 
@@ -314,13 +329,16 @@ io.on('connection', (socket) =>
 
   // Load and play media
   socket.on('play', (media) => {
+    console.log('play', media, socket.room, socket.uuid);
     if (!checkSocket(socket)) return;
     var state = roomstate(socket)
     state.offsetTime = getTimeFunction();
     if (media !== undefined) state.media = media;
     else state.media = state.lastmedia;
     state.paused = false;
+    state.master = socket.uuid
     infoState(socket.room);
+    console.log('play', media, roomstate(socket));
   })
 
   // Stop media
@@ -348,9 +366,9 @@ io.on('connection', (socket) =>
     infoState(socket.room, socket.uuid);
   })
 
-  socket.on('playlist?', () => {
+  socket.on('medialist?', () => {
     if (!checkSocket(socket)) return;
-    infoPlaylist(socket.room, socket.uuid);
+    infoMedialist(socket.room, socket.uuid);
   })
 
   socket.on('devices?', () => {
@@ -366,16 +384,18 @@ io.on('connection', (socket) =>
     // answer is a list of 
     // { room: 'room1', videos: ['video1', 'video2', ...] }
     let rooms = [];
-    for (let roomid in STORE.rooms) rooms.push({room: roomid, videos: MEDIA.playlist(roomid)});
+    for (let roomid in STORE.rooms) rooms.push({room: roomid, videos: MEDIA.medialist(roomid)});
     socket.emit('rooms', rooms);
   })
 
   // Playsync all rooms
-  socket.on('playsync', () => {
+  socket.on('playsync', (roomlist) => {
     let offsetTime = getTimeFunction();
     for (let roomid in STORE.rooms) {
+      if (roomlist && !roomlist.includes(roomid)) continue;
+      console.log('playsync', roomid, roomstate(roomid).media, roomstate(roomid).lastmedia);
       roomstate(roomid).offsetTime = offsetTime;
-      roomstate(roomid).media = roomstate(roomid).lastmedia;
+      // roomstate(roomid).media = roomstate(roomid).lastmedia;
       roomstate(roomid).paused = false;
       infoState(roomid);
     }

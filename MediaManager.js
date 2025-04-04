@@ -67,7 +67,7 @@ MEDIA.save = () => {
 }
 
 // Get the list of videos in a room
-MEDIA.playlist = (room) => {
+MEDIA.medialist = (room) => {
     const roomPath = path.join(process.env.VIDEO_PATH, room);
     if (!fs.existsSync(roomPath)) return [];
     return fs.readdirSync(roomPath).filter(file => 

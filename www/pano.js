@@ -29,17 +29,18 @@ $('#uuid').text(UUID)
 // SocketIO
 //
 const socket = io()
+socket.uuid = UUID
 
 // Get ROOM from URL
 var room = urlParams.get('room') || window.location.pathname.split('#')[0].split('?')[0].split('/').pop()
 if (!room) room = 'default'
-console.log('room', room)
+socket.room = room
 
 // set page title to room name
 document.title = room + ' :: ' + UUID
 
 // PLAYER
-var player = new SyncPlayer( socket, UUID, 'body' )
+var player = new SyncPlayer( socket, 'body' )
 
 socket.on('hello', () => {
     console.log('========= connected ===========')

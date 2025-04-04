@@ -1,26 +1,21 @@
 
 // Virtual html5 media player
-// With event emitter
 
 class SyncPlayer extends VideoPlayer {
-  constructor( socket, uuid, container )  // Provide destination media element
+  constructor( socket, container )  // Provide destination media element
   {
-    super(uuid, container);
+    super(socket.uuid, container);
     
     // time
     this.currentTime = 0;
     this.offsetTime = 0;
     
     // state
-    this.media = null;
-    this.playing = true;
-    this.paused = false;
-    this.ended = false;
     this.synced = false;
     
     // syncer
     this._updateTimer = null;
-    this._refreshInterval = 250;  // 250
+    this._refreshInterval = 20;  // 250
     this._correctionTime = 5000;  // 5000
     this._seekThreshold = 400;    // 400
 
@@ -32,7 +27,7 @@ class SyncPlayer extends VideoPlayer {
 
     // Connect to Sync server WS
     //
-    this.socket.on('connect', () => {
+    socket.on('connect', () => {
       console.log('connected to sync server WS !');
 
       // start synchronization process
@@ -46,32 +41,37 @@ class SyncPlayer extends VideoPlayer {
       );
     })
 
-    this.socket.on('disconnect', () => {
+    socket.on('disconnect', () => {
       console.log('disconnected from sync server WS !');
       this.syncClient.stop();
       this.synced = false;
     })
 
     // State
-    this.socket.on('state', (data) => 
+    socket.on('state', (data) => 
     {
       console.log('state', data)
 
-      // this.globalzoom(data.zoom)
+      // Master
+      if(this.socket.uuid != data.master) this.playlist.clear()
+
+      // Media position & zoom
       if (data.mediainfo) {
         if (data.mediainfo.offset) this.globalposition(data.mediainfo.offset)
         if (data.mediainfo.zoom) this.globalzoom(data.mediainfo.zoom)
       }
       
-        this.offsetTime = data.offsetTime
+      // Sync offset
+      this.offsetTime = data.offsetTime
 
+      // Media
+      data.media = data.media || ''
       if (data.media != this.media || data.paused != this.element.paused) {
         if (data.media == '') this.stop()
         else if(!data.paused) this.play(data.media)
         else this.load(data.media)
       }
 
-    
     })
 
     // media element
@@ -82,13 +82,16 @@ class SyncPlayer extends VideoPlayer {
       this.play(media)
     })
 
-    socket.on('pause', () => {
-      this.pause()
-    })
-
     socket.on('stop', () => {
       this.stop()
     })
+
+    // Playlist
+    this.playlist = new Playlist()
+    this.playlist.on('play', (video, oneloop) => { socket.emit('play', video)  })
+    this.playlist.on('end', () => { console.log('playlist-end'); this.emit('playlist-end'); })
+    this.on('end', () => { console.log('end'); this.playlist.next()})
+
   }
 
     
@@ -96,18 +99,35 @@ class SyncPlayer extends VideoPlayer {
     if (this._updateTimer) { window.clearTimeout(this._updateTimer); this._updateTimer = null; }
 
     // Not playing
-    if (!this.media || this.element.paused) {
-      this._updateTimer = window.setTimeout(() => { this.update(); }, this._refreshInterval);
-      return
+    if (!this.media) return this.nextupdate()
+
+    // Not synced: pause
+    if (!this.synced) {
+      if (this.playing && !this.paused) this.pause();
+      return this.nextupdate()
     }
 
-    const targetTime = this.getSyncTime() % this.element.duration;
-    const currentTime = this.element.currentTime;
+    // Now synced: play
+    if (this.synced && this.playing && this.paused) {
+      this.play();
+    }
 
+    const targetTime = this.getSyncTime() // % this.element.duration;
+    const currentTime = this.element.currentTime;
+    
+    var inBound = (targetTime >= 0) && (targetTime <= this.element.duration);
+
+    // Out of bound: stop
+    if (this.element.duration && !inBound) {
+      // console.log('out of bound', targetTime, currentTime);
+      // this.stop();
+      return this.nextupdate()
+    }
+    
     const diff = targetTime - currentTime;
     const rate = 1.0 + 1000*diff*diff / this._correctionTime // * this.remote.playbackRate;
 
-    // console.log('targetTime', targetTime, 'currentTime', currentTime, 'diff', diff, 'rate', rate, 'sourcePaused', sourcePaused, 'sourcePlaybackRate', sourcePlaybackRate);
+    // console.log('targetTime', targetTime, 'currentTime', currentTime, 'diff', diff, 'rate', rate);
 
     if (rate < 0.97 || rate > 1.03 || Math.abs(diff) >= this._seekThreshold/1000) {
       this.element.currentTime = targetTime;
@@ -123,8 +143,12 @@ class SyncPlayer extends VideoPlayer {
       this.element.playbackRate = rate;
     }
     
+    return this.nextupdate();    
+  }
+
+  nextupdate() {
+    if (this._updateTimer) { window.clearTimeout(this._updateTimer); this._updateTimer = null; }
     this._updateTimer = window.setTimeout(() => { this.update(); }, this._refreshInterval);
-    
   }
 
   // get synced time

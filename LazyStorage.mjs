@@ -39,10 +39,11 @@ class LazyStorage {
 
   save() {
     try {
-      console.log(` = LS: Saving data to ${this.filePath}...`);
+      // console.log(` = LS: Saving data to ${this.filePath}...`);
       const jsonString = JSON.stringify(this._data, null, 2);
       writeFileSync(this.filePath, jsonString);
-      console.log(` = LS: Successfully saved data to ${this.filePath}`);
+      // console.log(` = LS: Successfully saved data to ${this.filePath}`);
+      console.log(` = LS: saved`);
     } catch (error) {
       console.error(` = LS: Error saving JSON to ${this.filePath}:`, error);
     }

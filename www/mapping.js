@@ -27,11 +27,12 @@ var ACTIVEMEDIA = null
 // SocketIO
 //
 const socket = io()
+socket.uuid = UUID
 
 // Get ROOM from URL
 var room = window.location.pathname.split('/').pop()
 if (!room || room == 'control') room = 'default'
-console.log('room', room)
+socket.room = room
 
 // Set page title to room name
 document.title = room + ' :: MAPPING'
@@ -39,7 +40,7 @@ $('#roomname').text(room)
 
 // Players
 //
-var player = new SyncPlayer( socket, UUID, 'body' )
+var player = new SyncPlayer( socket, 'body' )
 var devices = new DevicePool( room, player )
 
 var touchStart = null
@@ -63,16 +64,22 @@ socket.on('devices', (data) => {
     devices.update(data)
 })
 
-socket.on('playlist', (data) => {
-    console.log('playlist', data)
+socket.on('medialist', (data) => {
+    console.log('medialist', data)
     // Create button for each video
-    $('#playlist').empty()
+    $('#medialist').empty()
     data.forEach((v) => {
-        $('#playlist').append(`<button class="btn btn-fullwidth" onclick="socket.emit('play', '${v}')">${v}</button><br />`)
+        $(`<button class="btn btn-fullwidth">${v}</button><br />`).appendTo('#medialist')
+            .on('click', () => {
+                console.log('<-playlist', room+'/'+v)
+                player.playlist.load([room+'/'+v])
+            })
+        
     })
 })
 
 socket.on('state', (data) => {
+    // media
     ACTIVEMEDIA = {media: (data.media != '') ? data.media : data.lastmedia, mediainfo: data.mediainfo}
     $('#medianame').text(ACTIVEMEDIA.media)
 })
@@ -138,7 +145,7 @@ $('#camera').click(() => {
 })
 
 $('#mediaBtn').click(() => {
-    $('#playlist').toggle()
+    $('#medialist').toggle()
 })
 
 $('#guest').click(() => {
