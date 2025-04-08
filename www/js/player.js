@@ -29,7 +29,7 @@ class VideoPlayer extends EventEmitter {
 
             this.video = $('<video class="player draggable" playsinline></video>').appendTo(this.stage);
         }
-        else this.video = $('<video class="player draggable" playsinline></video>').appendTo(this.container);
+        else this.video = $('<video class="player draggable" playsinline muted></video>').appendTo(this.container);
         
         this.video.attr('uuid', uuid)
 

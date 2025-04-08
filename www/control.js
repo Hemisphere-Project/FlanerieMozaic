@@ -39,15 +39,23 @@ socket.on('rooms', (data) => {
         let playerDiv = $('<div>').addClass('miniplayer').appendTo(rdiv)
         ROOMS[k].player = new SyncPlayer( ROOMS[k].socket, playerDiv )
 
+        // Reorder room.videos to put the starting with '_' first
+        room.videos.sort((a, b) => {
+            if (a.startsWith('_') && !b.startsWith('_')) return -1
+            if (!a.startsWith('_') && b.startsWith('_')) return 1
+            return 0
+        })
+
         // Medialist individual selection
         let ul = $('<ul>').appendTo(rdiv)
         for(let v of room.videos) {
             let li = $('<li>').appendTo(ul)
-            $('<button>').text(v).addClass('btn btn-fullwidth')
+            let b = $('<button>').text(v).addClass('btn btn-fullwidth')
                 .appendTo(li).click(() => {
                     console.log('<-playlist', ROOMS[k].socket.room+'/'+v)
                     ROOMS[k].player.playlist.load([ROOMS[k].socket.room+'/'+v], LOOP_ALL)
                 })
+            if (v.startsWith('_')) b.addClass('btn-mire')
         }
 
         // On Playlist end reload all playlists (if play synced)
@@ -57,6 +65,15 @@ socket.on('rooms', (data) => {
             for (let r of synced_rooms) r.player.playlist.reload() 
             socket.emit('playsync', ROOMS.filter(r => r.player.playlist.loop != LOOP_NONE).map(r => r.room))
         })
+
+        // Playlist button
+        ROOMS[k].videolist = room.videos.filter(v => !v.startsWith('_')).map(v => ROOMS[k].socket.room+'/'+v)
+        let li = $('<li>').appendTo(ul)
+        $('<button>').text('playlist').addClass('btn btn-fullwidth btn-playlist')
+            .appendTo(li).click(() => {
+                console.log('<-playlist', ROOMS[k].videolist)
+                ROOMS[k].player.playlist.load(ROOMS[k].videolist, LOOP_ALL)
+            })
     }
 })
 
@@ -72,6 +89,11 @@ $('#playsync').click(() => {
 
 $('#stopsync').click(() => {
     socket.emit('stopsync')
+})
+
+$('#listsync').click(() => {
+    for(let k in ROOMS) ROOMS[k].player.playlist.load(ROOMS[k].videolist, LOOP_ALL)
+    socket.emit('playsync')
 })
 
 

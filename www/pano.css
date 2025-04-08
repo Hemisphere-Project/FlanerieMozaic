@@ -172,6 +172,17 @@ a {
     width: 100%;
 }
 
+.btn-playlist {
+    margin-top: 30px;
+    border: 2px solid #3d8045;
+    color: #3d8045;
+}
+
+.btn-mire {
+    border: 2px solid #5e5e5e;
+    color: #5e5e5e;
+}
+
 #uuid {
     font-size: 14px;
     color: #ccc;
@@ -222,6 +233,7 @@ a {
     position: relative;
     width: 100%;
     height: 100%;
+    transform: none !important;
 }
 
 
