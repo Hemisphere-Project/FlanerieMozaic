@@ -57,13 +57,21 @@ class Device {
         $(controls).append('<br><br>')
 
         // zoomdevice
-        $('<div class="zdev">zoom <span></span></div>').appendTo(controls)
+        $('<div class="zdev">device zoom <span></span></div>').appendTo(controls)
         $('<button class="btnZoom">-</button>').appendTo(controls).on('click', () => {
             this.dom.trigger('zoomdelta', -0.01)
         })
         $('<button class="btnZoom">+</button>').appendTo(controls).on('click', () => {
             this.dom.trigger('zoomdelta', 0.01)
         })
+        $(controls).append('<br><br>')
+
+        // Mute checkbox
+        $('<input type="checkbox" class="mute">').appendTo(controls).on('change', (e) => {
+            let mute = $(e.target).is(':checked')
+            socket.emit('deviceconf', 'volume', (mute)? 0.0 : 1.0, this.uuid)
+        })
+        $('<label>mute</label>').appendTo(controls)
 
         // remove
         $(controls).append('<br><br>')
@@ -77,6 +85,7 @@ class Device {
         this.position = data.position
         this.resolution = data.resolution
         this.zoomdevice = data.zoomdevice
+        this.volume = data.volume
         this.alive = data.alive
 
         this.dom.removeClass(this.mode)
@@ -88,6 +97,9 @@ class Device {
 
         // zoom value
         this.dom.find('.zdev span').text(Math.round(this.zoomdevice*100) + '%')
+
+        // mute checkbox
+        this.dom.find('.mute').prop('checked', (this.volume == 0.0))
 
         if (this.alive) this.dom.addClass('alive')
         else this.dom.removeClass('alive')
@@ -122,7 +134,7 @@ class DevicePool {
     update(data) 
     {
         if (!data) return
-        console.log('update', data)   
+        console.log('devices', data)   
 
         for (let uuid in data) 
             if (uuid != 0 && uuid != -1)

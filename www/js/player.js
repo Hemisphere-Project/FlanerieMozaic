@@ -13,8 +13,20 @@ class VideoPlayer extends EventEmitter {
 
         this.uuid = uuid
         this.container = $(container);
-
-        if (!uuid.startsWith('_control')) {
+        this.backstage = null
+        this.stage = null
+        this.origin = null
+        
+        
+        // the video element
+        this.video = $('<video class="player draggable" playsinline></video>')
+        this.video.attr('uuid', uuid)
+        
+        // Full backstage/stage/origin layered player
+        //
+        let target = this.container
+        if (!uuid.startsWith('_control')) 
+        {
             this.backstage = $('<div class="backstage draggable"></div>').appendTo(this.container);
             this.backstage.attr('uuid', uuid)
             
@@ -25,13 +37,16 @@ class VideoPlayer extends EventEmitter {
             this.scaleStage(1.0)
 
             // add origin cross to stage
-            this.origin = $('<div class="origin"></div>').appendTo(this.stage)
-
-            this.video = $('<video class="player draggable" playsinline></video>').appendTo(this.stage);
+            if (uuid.startsWith('_mapping'))
+                this.origin = $('<div class="origin"></div>').appendTo(this.stage)
+            
+            target = this.stage
         }
-        else this.video = $('<video class="player draggable" playsinline muted></video>').appendTo(this.container);
-        
-        this.video.attr('uuid', uuid)
+        this.video.appendTo(target);
+
+        // Muted for controlers / mappers
+        if (uuid.startsWith('_')) this.volume(0.0)
+        else this.volume(1.0)
 
         this.video.on('ended', () => {
             this.stop(false)
@@ -122,7 +137,8 @@ class VideoPlayer extends EventEmitter {
         console.log('UPDATE', data)
         this.localposition(data.position)
         this.localzoom(data.zoomdevice)
-        this.mode(data.mode) 
+        this.mode(data.mode)
+        if ('volume' in data) this.volume(data.volume)
     }
 
     load(media) {
@@ -187,6 +203,15 @@ class VideoPlayer extends EventEmitter {
 
     loop(loop) {
         this.video[0].loop = loop
+    }
+
+    volume(vol) {
+        console.log('SET volume', vol)
+        this.video[0].volume = vol
+    }
+
+    mute(mute) {
+        this.video[0].muted = mute
     }
 
 }

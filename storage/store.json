@@ -2,41 +2,44 @@
   "rooms": {
     "screen1": {
       "state": {
-        "offsetTime": 1288.652981832,
+        "offsetTime": 135.212678431,
         "media": "screen1/mire.mp4",
         "lastmedia": "screen1/mire.mp4",
-        "mediainfo": {},
+        "mediainfo": {
+          "zoom": 0.7999999999999999
+        },
         "paused": false,
         "ctrls": false,
-        "master": "_control-8dxr4ess2fo-0"
+        "master": "_control-121nnronigu-0"
       },
       "devices": {
         "225oqeb7myl5l3jnalcqyc": {
           "position": {
-            "x": 231,
-            "y": 153
+            "x": -91,
+            "y": -59
           },
           "resolution": {
             "x": 1187,
-            "y": 1133
+            "y": 965
           },
           "zoomdevice": 1.3000000000000003,
           "alive": false,
           "selected": false,
-          "mode": "new"
+          "mode": "new",
+          "volume": 0
         }
       },
       "random": 0.15573521424568315
     },
     "default": {
       "state": {
-        "offsetTime": 1283.010830247,
+        "offsetTime": 135.213339951,
         "media": "default/mire.mp4",
         "lastmedia": "default/mire.mp4",
         "mediainfo": {},
         "paused": false,
         "ctrls": false,
-        "master": "_control-8dxr4ess2fo-1"
+        "master": "_control-121nnronigu-1"
       },
       "devices": {
         "225oqeb7myl5l3jnalcqyc": {
@@ -45,7 +48,7 @@
             "y": 372
           },
           "resolution": {
-            "x": 1862,
+            "x": 1187,
             "y": 965
           },
           "zoomdevice": 1,

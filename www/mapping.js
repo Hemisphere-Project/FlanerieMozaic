@@ -60,28 +60,58 @@ socket.on('hello', () => {
 // })
 
 socket.on('devices', (data) => {
-    console.log('devices', data)
     devices.update(data)
 })
 
 socket.on('medialist', (data) => {
-    console.log('medialist', data)
-    // Create button for each video
+
     $('#medialist').empty()
+    console.log('medialist', data)
+
+    // convert data to array
+    data = Object.keys(data).map((key) => {
+        return data[key]
+    })
+
+    // Create button for each video
     data.forEach((v) => {
-        $(`<button class="btn btn-fullwidth">${v}</button><br />`).appendTo('#medialist')
+        if (v.file.startsWith('_')) return
+        $(`<button class="btn btn-fullwidth">${v.file}</button><br />`).appendTo('#medialist')
             .on('click', () => {
-                console.log('<-playlist', room+'/'+v)
-                player.playlist.load([room+'/'+v])
+                console.log('<-playlist', v.filepath)
+                player.playlist.load([v.filepath])
             })
-        
+    })
+    
+    // Create button for playlist
+    let playlist = data.filter(v => !v.file.startsWith('_')).map(v => v.filepath)
+    $(`<button class="btn btn-fullwidth btn-playlist">playlist</button><br />`).appendTo('#medialist')
+    .on('click', () => {
+        console.log('<-playlist', playlist)
+        player.playlist.load(playlist)
+    })
+
+    // Stop button
+    $(`<button class="btn btn-fullwidth btn-stop">stop</button><br />`).appendTo('#medialist')
+        .on('click', () => {
+            socket.emit('stop')
+        })
+    
+    // Create button for each mire
+    data.forEach((v) => {
+        if (!v.file.startsWith('_')) return
+        $(`<button class="btn btn-fullwidth btn-mire">${v.file}</button><br />`).appendTo('#medialist')
+            .on('click', () => {
+                console.log('<-playlist', v.filepath)
+                player.playlist.load([v.filepath])
+            })
     })
 })
 
 socket.on('state', (data) => {
     // media
     ACTIVEMEDIA = {media: (data.media != '') ? data.media : data.lastmedia, mediainfo: data.mediainfo}
-    $('#medianame').text(ACTIVEMEDIA.media)
+    $('#medianame').text(ACTIVEMEDIA.media.split('/').pop())
 })
 
 $('#zoomPlus').click(() => {    

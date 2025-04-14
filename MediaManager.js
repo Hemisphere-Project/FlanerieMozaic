@@ -28,34 +28,76 @@ MEDIA.load = () => {
 
     // For each folder (room) in VIDEO_PATH, for each file in the folder, 
     // get hash of the file and store it in the MEDIA.conf. 
-    // if hash is already in the MEDIA.conf but different, remove the 'filename' subfolder
     // 'filename' subfolder contains the re-encoded videos for the devices
-    // 'filename' is the name of the original video file without the extension
     const rooms = fs.readdirSync(process.env.VIDEO_PATH).filter(file => fs.lstatSync(path.join(process.env.VIDEO_PATH, file)).isDirectory());
     rooms.forEach(room => {
         if (!MEDIA.conf[room]) MEDIA.conf[room] = {};
         if (!MEDIA.conf[room].medias) MEDIA.conf[room].medias = {}
         const roomPath = path.join(process.env.VIDEO_PATH, room);
+        
+        // For each file in the room, get hash of the file and store it in the MEDIA.conf
         const files = fs.readdirSync(roomPath).filter(file => fs.lstatSync(path.join(roomPath, file)).isFile());
         files.forEach(file => {
-            const hash = crypto.createHash('md5').update(fs.readFileSync(path.join(roomPath, file))).digest('hex');
-            if (!MEDIA.conf[room].medias[file]) MEDIA.conf[room].medias[file] = {};
+
+            // add file
+            const name = file.split('.').slice(0, -1).join('.');
+            const filepath = path.join(room, file);
+            const filepath_full = path.join(process.env.VIDEO_PATH, filepath);
+            const subfolder = path.join(room, name);
+            const hash = crypto.createHash('md5').update(fs.readFileSync(filepath_full)).digest('hex');
+
+            if (!MEDIA.conf[room].medias[file]) MEDIA.conf[room].medias[file] = {'hash': hash};
+            
+            // hash changed -> remove the 'filename' subfolder
             if (MEDIA.conf[room].medias[file].hash !== hash) {
                 MEDIA.conf[room].medias[file].hash = hash;
-                const filename = file.split('.').slice(0, -1).join('.');
-                const filenamePath = path.join(roomPath, filename);
-                if (fs.existsSync(filenamePath)) fs.rmdirSync(filename);
+                if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
             }
         })
+
+        // Default values 
+        for (let room in MEDIA.conf) {
+            for (let media in MEDIA.conf[room].medias) {
+                let m = MEDIA.conf[room].medias[media];
+                if (!m.name)        m.name = media.split('.').slice(0, -1).join('.');
+                if (!m.file)        m.file = media;
+                if (!m.hash)        m.hash = '';
+                if (!m.zoom)        m.zoom = 1.0;
+                if (!m.offset)      m.offset = {x: 0, y: 0};
+                if (!m.filepath)    m.filepath = path.join(room, m.file);
+                if (!m.subfolder)   m.subfolder = path.join(room, m.name);
+                if (!m.submedias)   m.submedias = [];
+            }
+        }
+
+        // For each media in the room, check if the media is in the folder
+        for (let media in MEDIA.conf[room].medias) {
+
+            const subfolder = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[media].subfolder);
+
+            // if the media is not in the folder, remove it from the MEDIA.conf
+            // and remove the 'filename' subfolder
+            if (!files.includes(media)) {
+                if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
+                delete MEDIA.conf[room].medias[media];
+                continue
+            }
+
+            // media eixsts but the 'filename' subfolder does not exist
+            // -> create it
+            if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder);
+
+            // Update sub-media list (list of medias in the 'filename' subfolder)
+            const subfiles = fs.readdirSync(subfolder).filter(file => fs.lstatSync(path.join(roomPath, file)).isFile());
+            MEDIA.conf[room].medias[media].submedias = [];
+            subfiles.forEach(file => {
+                MEDIA.conf[room].medias[media].push(file);
+            })
+        }
+
     })
 
-    // Set default values for each media
-    for (let room in MEDIA.conf) {
-        for (let media in MEDIA.conf[room].medias) {
-            if (!MEDIA.conf[room].medias[media].zoom) MEDIA.conf[room].medias[media].zoom = 1.0;
-            if (!MEDIA.conf[room].medias[media].offset) MEDIA.conf[room].medias[media].offset = {x: 0, y: 0};
-        }
-    }
+    
 
     MEDIA.save();
     console.log('MEDIA', JSON.stringify(MEDIA.conf, null, 4));
@@ -68,12 +110,16 @@ MEDIA.save = () => {
 
 // Get the list of videos in a room
 MEDIA.medialist = (room) => {
-    const roomPath = path.join(process.env.VIDEO_PATH, room);
-    if (!fs.existsSync(roomPath)) return [];
-    return fs.readdirSync(roomPath).filter(file => 
-        fs.lstatSync(path.join(roomPath, file)).isFile()
-        && file.split('.').pop() === 'mp4'
-    );
+    // const roomPath = path.join(process.env.VIDEO_PATH, room);
+    // if (!fs.existsSync(roomPath)) return [];
+    // return fs.readdirSync(roomPath).filter(file => 
+    //     fs.lstatSync(path.join(roomPath, file)).isFile()
+    //     && file.split('.').pop() === 'mp4'
+    // );
+    if (!MEDIA.conf) MEDIA.load();
+    if (!MEDIA.conf[room]) return {}
+    if (!MEDIA.conf[room].medias) return {}
+    return MEDIA.conf[room].medias;
 }
 
 

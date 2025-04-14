@@ -48,4 +48,5 @@ class Playlist extends EventEmitter {
         this.playlist = []
         this.index = 0
     }
+
 }

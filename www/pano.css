@@ -91,26 +91,30 @@ a {
     position: absolute;
     top: 0;
     left: 0;
-    width: 220px;
+    width: 237px;
     max-height: 95%;
     padding: 10px;
     margin: 5px;
     box-sizing: border-box;
     border: 1px solid #ccc;
     z-index: 90;
-    background-color: rgba(50, 50, 50, 0.8);
-    font-size: 16px;
-    line-height: 25px;
+    background-color: rgba(0, 0, 0, 0.75);
+    font-size: 15px;
+    line-height: 37px;
     overflow-y: auto;
     overflow-x: hidden;
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
 }
 
 #controls h2 {
     font-size: 25px;
     margin: 0;
-    padding: 5px;
+    padding: 0px 7px;
     background-color: #888;
     color: black;
+    margin-bottom: 9px;
+    /* text-align: center; */
 }
 
 #controls h3 {
@@ -119,12 +123,14 @@ a {
     padding: 0 5px;
     background-color: #666;
     color: black;
+    line-height: 25px;
 }
 
 
-#controls > svg.feather {
-    width: 30px;
-    height: 30px;
+#controls svg.feather {
+    width: 25px;
+    height: 25px;
+    margin-bottom: -8px;
 }
 
 #controls #selectAll {
@@ -173,9 +179,15 @@ a {
 }
 
 .btn-playlist {
-    margin-top: 30px;
+    margin-top: 20px;
     border: 2px solid #3d8045;
     color: #3d8045;
+}
+
+.btn-stop {
+    margin-bottom: 20px;
+    border: 2px solid #8a2f2f;
+    color: #8a2f2f;
 }
 
 .btn-mire {
@@ -226,7 +238,7 @@ a {
 
 .miniplayer {
     width: 100%;
-    /* max-height: 120px; */
+    min-height: 160px;
 }
 
 .miniplayer .player {
@@ -281,13 +293,25 @@ a {
 /* device controls */
 
 .devCtrls {
-    padding: 20px;
+    padding: 10px;
     max-width: 100%;
     overflow: hidden;
+    height: calc(100% - 20px);
 }
 
-.devCtrls, .devCtrls > button, .devCtrls > input, .devCtrls > select {
+.devCtrls, 
+.devCtrls > button, 
+.devCtrls > input, 
+.devCtrls > select,
+.devCtrls > option {
     font-size: 35px;
+}
+
+/* checkbox */
+.devCtrls input[type="checkbox"] {
+    width: 30px;
+    height: 30px;
+    margin-right: 10px;
 }
 
 .devCtrls .btnZoom {
@@ -296,10 +320,16 @@ a {
     margin-left: 10px;
 }
 
+.devCtrls .btnRem {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+
 
 /* Control Rooms */
 #rooms {
-    margin-left: 225px;
+    margin-left: 247px;
 }
 
 .room {
