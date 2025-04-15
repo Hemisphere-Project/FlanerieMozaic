@@ -74,9 +74,14 @@ class Device {
         $('<label>mute</label>').appendTo(controls)
 
         // remove
-        $(controls).append('<br><br>')
         $('<button class="btnRem">remove</button>').appendTo(controls).on('click', () => {
             socket.emit('remove', this.uuid)
+        })
+
+        // submedia
+        $('<button class="btnSub">snap</button>').appendTo(controls).on('click', () => {
+            socket.emit('snap', this.uuid)
+            return false
         })
         
     }
@@ -121,6 +126,17 @@ class Device {
         else this.dom.removeClass('selected')
         socket.emit('select', this.selected)
     }
+
+    submedia_available(has) {
+        if (has) {
+            this.dom.addClass('hasSubmedia')
+            this.dom.removeClass('hasNotSubmedia')
+        }
+        else {
+            this.dom.addClass('hasNotSubmedia')
+            this.dom.removeClass('hasSubmedia')
+        }
+    }
 }        
 
 class DevicePool {
@@ -146,6 +162,15 @@ class DevicePool {
 
         for (let uuid in this.devices)
             if (!data[uuid]) this.remove(uuid)
+    }
+
+    updateSubmedia(data) {
+        // if (!data) return
+        data = data.map((v) => { return v.split('.').slice(0, -1).join('.') })
+        for (let uuid in this.devices) {
+            let has = data.includes(this.devices[uuid].uuid)
+            this.devices[uuid].submedia_available(has)
+        }
     }
 
     remove(uuid) {

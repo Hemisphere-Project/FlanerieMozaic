@@ -112,9 +112,13 @@ socket.on('state', (data) => {
     // media
     ACTIVEMEDIA = {media: (data.media != '') ? data.media : data.lastmedia, mediainfo: data.mediainfo}
     $('#medianame').text(ACTIVEMEDIA.media.split('/').pop())
+
+    // submedia per devices
+    if (data.mediainfo.submedias !== undefined) devices.updateSubmedia(data.mediainfo.submedias)
 })
 
 $('#zoomPlus').click(() => {    
+    console.log('zoomPlus', ACTIVEMEDIA)
     if (ACTIVEMEDIA)
         socket.emit('mediaconf', ACTIVEMEDIA.media, 'zoom', ACTIVEMEDIA.mediainfo.zoom + 0.1)
 })
@@ -130,6 +134,7 @@ $('#panLeft').click(() => {
 })
 
 $('#panRight').click(() => {
+    console.log('panRight', ACTIVEMEDIA)
     if (ACTIVEMEDIA)
         socket.emit('mediaconf', ACTIVEMEDIA.media, 'offset', {x: ACTIVEMEDIA.mediainfo.offset.x + 10, y: ACTIVEMEDIA.mediainfo.offset.y})
 })
@@ -249,6 +254,13 @@ document.getElementById('controls').addEventListener('wheel', (e) => {
 $('#reloadAll').click(() => {
     if (!confirm('Reload all devices?')) return
     socket.emit('reloadAll')
+})
+
+// SNAP
+$('#snapAll').click(() => {
+    if (!ACTIVEMEDIA) return 
+    if (!confirm('Create snap for all devices ?')) return
+    socket.emit('snapAll', ACTIVEMEDIA.media) 
 })
 
 // SELECT

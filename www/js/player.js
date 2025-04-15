@@ -17,6 +17,8 @@ class VideoPlayer extends EventEmitter {
         this.stage = null
         this.origin = null
         
+        this.submediaplayback = false
+        
         
         // the video element
         this.video = $('<video class="player draggable" playsinline></video>')
@@ -83,6 +85,12 @@ class VideoPlayer extends EventEmitter {
 
     // video css
     setvideocss() {
+        if (this.submediaplayback) {
+            this.video.css('transform', 'scale(1) translate(0px, 0px)')
+            this.video.addClass('maxiplayer')
+            return
+        }
+        this.video.removeClass('maxiplayer')
         let scale = this._globalzoom * this._localzoom
         let x = (this._localposition.x + this._globalposition.x) / scale
         let y = (this._localposition.y + this._globalposition.y) / scale
@@ -123,6 +131,12 @@ class VideoPlayer extends EventEmitter {
         // console.log('position', pos)
         $('#x').text(pos.x+" px")
         $('#y').text(pos.y+" px")
+        this.setvideocss()
+    }
+
+    // submedia mode (fullscreen with no zoom/offset)
+    setsubmediamode(mode) {
+        this.submediaplayback = mode
         this.setvideocss()
     }
 

@@ -35,6 +35,7 @@ socket.uuid = UUID
 var room = urlParams.get('room') || window.location.pathname.split('#')[0].split('?')[0].split('/').pop()
 if (!room) room = 'default'
 socket.room = room
+$('#roomname').text(room)
 
 // set page title to room name
 document.title = room + ' :: ' + UUID
@@ -67,6 +68,19 @@ socket.on('state', (data) => {
     else {
         $('#controls').hide()
         $('.player').removeClass('draggable')
+    }
+
+    // update media name
+    $('#mediaplay').text(player.media)
+
+    // update control class
+    if (player.submediaplayback) {
+        $('#controls').addClass('submedia')
+        $('#controls').removeClass('mainmedia')
+    }
+    else {
+        $('#controls').removeClass('submedia')
+        $('#controls').addClass('mainmedia')
     }
 })
 
@@ -129,25 +143,10 @@ function updateSize() {
 }
 $(window).on('orientationchange resize ready', updateSize)
 
-// SCROLL TO SCALE #player
-//
-// window.addEventListener("wheel", event => {
-//     const sign = Math.sign(event.deltaY);
-//     let s = Math.max(0.1, player.videoscale - sign * 0.1);
-//     socket.emit('zoom', room, s)
-//     // console.log(stagescale)
-// });
 
-// DOUBLE CLICK MENU
-//
-// $(window).on('dblclick', () => {
-//     $('#controls').toggle()
-//     $('.player').toggleClass('draggable')
-// })
 $('#controls').on('dblclick', (e) => {
     e.stopPropagation()
 })
-
 
 // CONTROLS / INFO
 //
@@ -157,18 +156,13 @@ $('#reload').click(() => {
     location.reload()
 })
 
-// PWA
-// if ("serviceWorker" in navigator) {
-//     window.addEventListener("load", function() {
-//       navigator.serviceWorker
-//         .register("/serviceWorker.js")
-//         .then(res => console.log("service worker registered"))
-//         .catch(err => console.log("service worker not registered", err))
-//     })
-//   }
-
 $('#fullscreen').click(() => {
     fullscreen()
+})
+
+$('#snap').click(() => {
+    if (player.state.media == '') return
+    socket.emit('snap', UUID, player.state.media)
 })
 
 
@@ -176,11 +170,9 @@ $('#fullscreen').click(() => {
 //
 
 $('#go').click(() => {
-
-    // if (mobileAndTabletCheck())
     $('#welcome').hide()
     wakeLock()
-    // fullscreen() 
+    fullscreen() 
     player.play()
 })
 

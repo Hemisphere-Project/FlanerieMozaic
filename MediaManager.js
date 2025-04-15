@@ -3,10 +3,11 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-// import ffmpeg from 'fluent-ffmpeg';
-import { exec } from 'child_process';
+import ffmpeg from 'fluent-ffmpeg';
+import { exec, execSync } from 'child_process';
 import 'dotenv/config';
 import { exit } from 'process';
+import e from 'express';
 
 if (!'VIDEO_PATH' in process.env) { console.log('VIDEO_PATH not defined in .env'); exit(1); }
 
@@ -51,6 +52,7 @@ MEDIA.load = () => {
             // hash changed -> remove the 'filename' subfolder
             if (MEDIA.conf[room].medias[file].hash !== hash) {
                 MEDIA.conf[room].medias[file].hash = hash;
+                MEDIA.conf[room].medias[file].resolution = { x: 0, y: 0 };
                 if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
             }
         })
@@ -64,6 +66,7 @@ MEDIA.load = () => {
                 if (!m.hash)        m.hash = '';
                 if (!m.zoom)        m.zoom = 1.0;
                 if (!m.offset)      m.offset = {x: 0, y: 0};
+                if (!m.resolution)  m.resolution = {x: 0, y: 0};
                 if (!m.filepath)    m.filepath = path.join(room, m.file);
                 if (!m.subfolder)   m.subfolder = path.join(room, m.name);
                 if (!m.submedias)   m.submedias = [];
@@ -88,16 +91,26 @@ MEDIA.load = () => {
             if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder);
 
             // Update sub-media list (list of medias in the 'filename' subfolder)
-            const subfiles = fs.readdirSync(subfolder).filter(file => fs.lstatSync(path.join(roomPath, file)).isFile());
+            const subfiles = fs.readdirSync(subfolder).filter(file => fs.lstatSync(path.join(subfolder,  file)).isFile());
             MEDIA.conf[room].medias[media].submedias = [];
             subfiles.forEach(file => {
-                MEDIA.conf[room].medias[media].push(file);
+                MEDIA.conf[room].medias[media].submedias.push(file);
             })
         }
 
+        // For each media check and detect resolution
+        for (let media in MEDIA.conf[room].medias) {
+            const filepath = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[media].filepath);
+            const subfolder = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[media].subfolder);
+            ffmpeg.ffprobe(filepath, (err, metadata) => {
+                if (err) console.log('ffprobe error', err);
+                if (metadata && metadata.streams && metadata.streams.length > 0) {
+                    MEDIA.conf[room].medias[media].resolution.x = metadata.streams[0].width;
+                    MEDIA.conf[room].medias[media].resolution.y = metadata.streams[0].height;
+                }
+            });
+        }
     })
-
-    
 
     MEDIA.save();
     console.log('MEDIA', JSON.stringify(MEDIA.conf, null, 4));
@@ -124,21 +137,153 @@ MEDIA.medialist = (room) => {
 
 
 // Configure a given media
-MEDIA.configure = function (room, video, key, value) {
+MEDIA.configure = function (media, key, value) {
+    let room = media.split('/')[0];
+    let video = media.split('/')[1];
+    if (!room || !video) return {};
     if (!MEDIA.conf[room]) MEDIA.conf[room] = {};
     if (!MEDIA.conf[room].medias) MEDIA.conf[room].medias = {}
     if (!MEDIA.conf[room].medias[video]) MEDIA.conf[room].medias[video] = {};
     MEDIA.conf[room].medias[video][key] = value;
+
+    // Media conf changed: destroy submedias folder and recreate
+    const subfolder = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[video].subfolder);
+    if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder, {recursive: true});
+    fs.mkdirSync(subfolder);
+    MEDIA.conf[room].medias[video].submedias = [];
+
     MEDIA.save();
     return MEDIA.conf[room].medias[video]
 }
 
+// Device configuration changed: remove all submedia with the device uuid in that room
+MEDIA.devicechanged = function (uuid, room) {
+    let didchange = false;
+    for (let m in MEDIA.conf[room].medias) {
+        const media = MEDIA.conf[room].medias[m];
+        const submedia = path.join(process.env.VIDEO_PATH, media.subfolder, uuid + '.mp4');
+        if (fs.existsSync(submedia)) {
+            fs.unlinkSync(submedia);
+            didchange = true;
+        }
+        media.submedias = media.submedias.filter((s) => { return s !== uuid + '.mp4'; });
+    }
+    MEDIA.save();
+    return didchange
+}
+
+
 // Get the configuration of a given media
-MEDIA.info = function (room, video) {
+MEDIA.info = function (path) {
+    let room = path.split('/')[0];
+    let video = path.split('/')[1];
+    if (!room || !video) return {};
     if (!MEDIA.conf[room]) return {};
     if (!MEDIA.conf[room].medias) return {};
     if (!MEDIA.conf[room].medias[video]) return {};
     return MEDIA.conf[room].medias[video];
+}
+
+MEDIA.unsnap = function (device, media) {
+    media = MEDIA.info(media);
+
+    if (!media || !media.filepath) return
+    if (!device || !device.uuid) return
+
+    const subfolder = path.join(process.env.VIDEO_PATH, media.subfolder);
+    const submedia = path.join(subfolder, device.uuid + '.mp4');
+
+    // Delete the submedia if it exists
+    if (fs.existsSync(submedia)) fs.unlinkSync(submedia);
+    media.submedias = media.submedias.filter((s) => { return s !== device.uuid + '.mp4'; });
+    MEDIA.save();
+}
+
+// Generate the submedia for a given device / media
+MEDIA.snap = function(device, media) {
+    media = MEDIA.info(media);
+
+    console.log('device =', device);
+    console.log('media =', media);
+
+    return new Promise((resolve, reject) => {
+        if (!media || !media.filepath) return reject('Media not found');
+        if (!device || !device.uuid) return reject('Device not found');
+
+        const subfolder = path.join(process.env.VIDEO_PATH, media.subfolder);
+        const submedia = path.join(subfolder, device.uuid + '.mp4');
+        const filepath = path.join(process.env.VIDEO_PATH, media.filepath);
+
+        // Delete the submedia if it exists
+        if (fs.existsSync(submedia)) fs.unlinkSync(submedia);
+
+        // Create the submedia using ffmpeg
+
+        // Device
+        const Dw = device.resolution.x;
+        const Dh = device.resolution.y;
+        const Dx = -1*device.position.x || 0;
+        const Dy = -1*device.position.y || 0;
+        const Dz = device.zoomdevice || 1.0;
+
+        // Media 
+        const Mw = media.resolution.x;
+        const Mh = media.resolution.y;
+        const Mx = -1*media.offset.x || 0;
+        const My = -1*media.offset.y || 0;
+        const Mz = media.zoom || 1.0;
+        
+        // Zoom
+        const zoom = Dz*Mz;
+
+        // Target snap size 
+        const snapW = Math.round(Dw / zoom);
+        const snapH = Math.round(Dh / zoom);
+
+        // Target snap position
+        const snapX = Math.round( (Dx+Mx) / zoom );
+        const snapY = Math.round( (Dy+My) / zoom );
+
+        // Padding (off media area of snap)
+        const padLeft = Math.max(0, -1 * snapX);
+        const padRight = Math.max(0, snapX + snapW - Mw);
+        const padTop = Math.max(0, -1 * snapY);
+        const padBottom = Math.max(0, snapY + snapH - Mh);
+
+        // Crop size (media area of snap)
+        const cropW = Math.max(0, snapW - padLeft - padRight);
+        const cropH = Math.max(0, snapH - padTop - padBottom);
+
+        // Crop position (media area of snap)
+        const cropX = Math.max(0, snapX);
+        const cropY = Math.max(0, snapY);
+
+        // Build simplified FFmpeg command
+        const cmd = `ffmpeg -i "${filepath}" \
+                        -vf "crop=${cropW}:${cropH}:${cropX}:${cropY},pad=${snapW}:${snapH}:${padLeft}:${padTop}:black" \
+                        -c:v libx264 -profile:v baseline -level 3.0 -preset slow -crf 20 -movflags +faststart -pix_fmt yuv420p -c:a aac -b:a 128k -ar 44100 \
+                        "${submedia}"`;
+
+
+        // Execute the command sync
+        try {
+            execSync(cmd, {stdio: 'inherit'});
+            console.log('\nsubmedia generated!', submedia, '\n')
+
+            // Push into submedias list
+            if (!media.submedias) media.submedias = [];
+            media.submedias.push(path.basename(submedia));
+            MEDIA.save();
+            
+            resolve();
+        }
+        catch (err) {
+            console.log('Error generating submedia', err);
+            reject(err);
+        }
+        
+    })
+
 }
 
 function getMediaManager() {

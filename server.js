@@ -68,7 +68,7 @@ function roomdevices(roomid) {
 function device(uuid, roomid) {
   if (uuid.startsWith('_')) return Object.assign({}, defaultDevice, {mode: 'control'});
   var devices = roomdevices(roomid);
-  devices[uuid] = Object.assign({}, defaultDevice, devices[uuid]);
+  devices[uuid] = Object.assign({'uuid': uuid}, defaultDevice, devices[uuid]);
   return devices[uuid];
 }
 
@@ -115,7 +115,8 @@ function infoState(roomid, targetid) {
 
   let media = state.media || state.lastmedia;
   state.lastmedia = media;
-  state.mediainfo = media ? MEDIA.info(roomid, media) : {};
+  state.mediainfo = media ? MEDIA.info(media) : {};
+  // console.log('infoState', roomid, state.mediainfo);
 
   // send light state (without devices)
   state = Object.assign({}, state);
@@ -197,10 +198,10 @@ io.on('connection', (socket) =>
     socket.join(uuid);
 
     if (uuid.startsWith('_')) {
-      console.log('anonymous player connected');
+      // console.log('anonymous player connected');
     }
     else {
-      console.log('device connected', uuid, room);
+      // console.log('device connected', uuid, room);
 
       let dev = bootstrapDevice(uuid, room, reso);
       
@@ -223,7 +224,7 @@ io.on('connection', (socket) =>
   // Configure media
   socket.on('mediaconf', (media, key, val) => {
     if (!checkSocket(socket)) return;
-    MEDIA.configure(socket.room, media, key, val)
+    MEDIA.configure(media, key, val)
     infoState(socket.room)
   })
 
@@ -232,6 +233,12 @@ io.on('connection', (socket) =>
     if (!checkSocket(socket)) return;
     uuid = uuid || socket.uuid;
     bootstrapDevice(uuid, socket.room)[key] = val; 
+    
+    let dc = false
+    if (key === 'position' || key === 'zoomdevice')
+      dc = MEDIA.devicechanged(uuid, socket.room)
+
+    if (dc) infoState(socket.room);
     infoDevices(socket.room);
   })
   
@@ -258,6 +265,35 @@ io.on('connection', (socket) =>
     
     infoDevices(socket.room);
   })
+
+  // generatee submedia 
+  socket.on('snap', (uuid, media) => {
+    if (!checkSocket(socket)) return;
+    if (!uuid) return;
+    if (uuid.startsWith('guest')) return;
+    if (uuid.startsWith('_')) return;
+
+    if (media === undefined) media = roomstate(socket.room).media;
+
+    let dev = device(uuid, socket.room);
+
+    MEDIA.unsnap(dev, media)
+    infoState(socket.room, uuid);
+    var now = Date.now();
+
+    MEDIA.snap(dev, media)
+      .then(() => {
+        // wait at least 2s since now
+        setTimeout(() => {
+          infoMedialist(socket.room);
+          infoState(socket.room);
+        }, Math.max(2000 - (Date.now() - now), 0));
+      })
+      .catch((err) => {
+        console.error('Error during snap', err);
+      })
+  })
+
 
   // select device
   socket.on('select', (selected, uuid) => {
@@ -287,11 +323,15 @@ io.on('connection', (socket) =>
   socket.on('move', (delta, uuid) => 
   {
     if (!checkSocket(socket)) return;
+    let dc = false;
     uuid = uuid || socket.uuid;
     // console.log('move', uuid, socket.room, delta);
     var dev = bootstrapDevice(uuid, socket.room);
     dev.position.x += delta.x;
     dev.position.y += delta.y;
+
+    dc = MEDIA.devicechanged(uuid, socket.room)
+    if (dc) infoState(socket.room);
     infoDevices(socket.room);
   })
 
@@ -299,11 +339,14 @@ io.on('connection', (socket) =>
   socket.on('moveAll', (delta) => 
   {
     if (!checkSocket(socket)) return;
+    let dc = false;
     for (let uuid in room(socket).devices) {
       let dev = device(uuid, socket);
       dev.position.x += delta.x*dev.zoomdevice;
       dev.position.y += delta.y*dev.zoomdevice;
+      dc = MEDIA.devicechanged(uuid, socket.room)
     }
+    if (dc) infoState(socket.room);
     infoDevices(socket.room);
   })
 
@@ -311,11 +354,16 @@ io.on('connection', (socket) =>
   socket.on('clearDevices', () => 
   {
     if (!checkSocket(socket)) return;
+    let dc = false;
     for (let uuid in room(socket).devices) {
       let dev = device(uuid, socket);
       if (dev.alive) dev.alive = false;
-      else if (!uuid.startsWith('guest')) delete room(socket).devices[uuid];
+      else if (!uuid.startsWith('guest')) {
+        delete room(socket).devices[uuid];
+        dc = MEDIA.devicechanged(uuid, socket.room)
+      }
     }
+    if (dc) infoState(socket.room);
     infoDevices(socket.room);
   })
 
@@ -329,7 +377,6 @@ io.on('connection', (socket) =>
 
   // Load and play media
   socket.on('play', (media) => {
-    console.log('play', media, socket.room, socket.uuid);
     if (!checkSocket(socket)) return;
     var state = roomstate(socket)
     state.offsetTime = getTimeFunction();
@@ -338,7 +385,7 @@ io.on('connection', (socket) =>
     state.paused = false;
     state.master = socket.uuid
     infoState(socket.room);
-    console.log('play', media, roomstate(socket));
+    // console.log('play', media, roomstate(socket));
   })
 
   // Stop media
@@ -359,6 +406,33 @@ io.on('connection', (socket) =>
   socket.on('reloadAll', () => {
     if (!checkSocket(socket)) return;
     io.to(socket.room).emit('reload');
+  })
+
+  // snapAll
+  socket.on('snapAll', (media) => {
+    if (!checkSocket(socket)) return;
+
+    for (let uuid in room(socket).devices) {
+      let dev = device(uuid, socket);
+      MEDIA.unsnap(dev, media)
+    }
+    infoState(socket.room);
+    var now = Date.now();
+    
+    let allPromises = [];
+    for (let uuid in room(socket).devices) {
+      let dev = device(uuid, socket);
+      allPromises.push( MEDIA.snap(dev, media) )
+    }
+
+    Promise.all(allPromises)
+      .then(() => {
+        // wait at least 2s since now
+        setTimeout(() => {
+          infoMedialist(socket.room);
+          infoState(socket.room);
+        }, Math.max(2000 - (Date.now() - now), 0));
+      })
   })
   
   socket.on('state?', () => {

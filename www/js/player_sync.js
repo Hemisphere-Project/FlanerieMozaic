@@ -55,22 +55,39 @@ class SyncPlayer extends VideoPlayer {
       // Master
       if(this.socket.uuid != data.master) this.playlist.clear()
 
-      // Media position & zoom
-      if (data.mediainfo) {
-        if (data.mediainfo.offset) this.globalposition(data.mediainfo.offset)
-        if (data.mediainfo.zoom) this.globalzoom(data.mediainfo.zoom)
-      }
+      // Media
+      let mediaplay = data.media || ''
+      let playingsubmedia = false
       
+      if (mediaplay != '')
+        for (let submedia of data.mediainfo.submedias) {
+          if (submedia.split('.').slice(0, -1).join('.') == this.uuid) {
+            mediaplay = data.mediainfo.subfolder + '/' + submedia
+            playingsubmedia = true
+            break
+          }
+        }
+      // console.log('mediaplay', mediaplay, data)
+      console.log('playingsubmedia', playingsubmedia)
+
+      if (mediaplay != this.media || data.paused != this.element.paused) {
+        if (mediaplay == '') this.stop()
+        else if(!data.paused) this.play(mediaplay)
+        else this.load(mediaplay)
+      }
+
+      // Submedia mode
+      this.setsubmediamode(playingsubmedia)
+
+      // Media position & zoom
+      if (data.mediainfo.offset) this.globalposition(data.mediainfo.offset)
+      if (data.mediainfo.zoom) this.globalzoom(data.mediainfo.zoom)
+      
+      // Save state
+      this.state = data
+        
       // Sync offset
       this.offsetTime = data.offsetTime
-
-      // Media
-      data.media = data.media || ''
-      if (data.media != this.media || data.paused != this.element.paused) {
-        if (data.media == '') this.stop()
-        else if(!data.paused) this.play(data.media)
-        else this.load(data.media)
-      }
 
     })
 

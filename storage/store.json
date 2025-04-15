@@ -2,28 +2,45 @@
   "rooms": {
     "screen1": {
       "state": {
-        "offsetTime": 135.212678431,
-        "media": "screen1/mire.mp4",
-        "lastmedia": "screen1/mire.mp4",
+        "offsetTime": 993.843755207,
+        "media": "screen1/0_small.mp4",
+        "lastmedia": "screen1/0_small.mp4",
         "mediainfo": {
-          "zoom": 0.7999999999999999
+          "hash": "a3ac7ddabb263c2d00b73e8177d15c8d",
+          "zoom": 3.0000000000000018,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "name": "0_small",
+          "submedias": [
+            "225oqeb7myl5l3jnalcqyc.mp4"
+          ],
+          "filepath": "screen1/0_small.mp4",
+          "subfolder": "screen1/0_small",
+          "file": "0_small.mp4",
+          "resolution": {
+            "x": 560,
+            "y": 320
+          }
         },
         "paused": false,
-        "ctrls": false,
-        "master": "_control-121nnronigu-0"
+        "ctrls": true,
+        "master": "_mapping-1p7y9eo03fi"
       },
       "devices": {
         "225oqeb7myl5l3jnalcqyc": {
+          "uuid": "225oqeb7myl5l3jnalcqyc",
           "position": {
-            "x": -91,
-            "y": -59
+            "x": -1123,
+            "y": -572
           },
           "resolution": {
-            "x": 1187,
-            "y": 965
+            "x": 1439,
+            "y": 1085
           },
-          "zoomdevice": 1.3000000000000003,
-          "alive": false,
+          "zoomdevice": 2,
+          "alive": true,
           "selected": false,
           "mode": "new",
           "volume": 0
@@ -33,16 +50,33 @@
     },
     "default": {
       "state": {
-        "offsetTime": 135.213339951,
-        "media": "default/mire.mp4",
-        "lastmedia": "default/mire.mp4",
-        "mediainfo": {},
+        "offsetTime": 36.87404749,
+        "media": "",
+        "lastmedia": "default/0_small.mp4",
+        "mediainfo": {
+          "hash": "a3ac7ddabb263c2d00b73e8177d15c8d",
+          "zoom": 1.1,
+          "offset": {
+            "x": 0,
+            "y": 0
+          },
+          "name": "0_small",
+          "submedias": [],
+          "filepath": "default/0_small.mp4",
+          "subfolder": "default/0_small",
+          "file": "0_small.mp4",
+          "resolution": {
+            "x": 560,
+            "y": 320
+          }
+        },
         "paused": false,
         "ctrls": false,
-        "master": "_control-121nnronigu-1"
+        "master": "_control-l8py3o3s1ik-1"
       },
       "devices": {
         "225oqeb7myl5l3jnalcqyc": {
+          "uuid": "225oqeb7myl5l3jnalcqyc",
           "position": {
             "x": 260,
             "y": 372
@@ -58,6 +92,5 @@
         }
       }
     }
-  },
-  "random": 0.052439042309492034
+  }
 }

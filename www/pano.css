@@ -107,6 +107,14 @@ a {
     scrollbar-width: none;  /* Firefox */
 }
 
+#controls.submedia {
+    border: 1px solid #0f0;
+}
+
+#controls.mainmedia {
+    border: 1px solid #f00;
+}
+
 #controls h2 {
     font-size: 25px;
     margin: 0;
@@ -236,6 +244,13 @@ a {
     /* object-fit: fill; */
 }
 
+/* fill viewport */
+.player.maxiplayer {
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+}
+
 .miniplayer {
     width: 100%;
     min-height: 160px;
@@ -276,18 +291,23 @@ a {
 }
 
 .device.guest {
-    border: 1px solid #ff0;
     background-color: rgba(100, 100, 30, 0.5);
 }
 
 .device.alive {
-    border: 1px solid #0f0;
     background-color: rgba(30, 100, 30, 0.5);
 }
 
 .device.selected, .device.alive.selected, .device.guest.selected {
-    border: 2px solid #0ff;
     background-color: rgba(30, 30, 30, 0.5);
+}
+
+.device.hasSubmedia {
+    border: 2px solid #0f0;
+}
+
+.device.hasNotSubmedia {
+    border: 2px solid red;
 }
 
 /* device controls */
@@ -324,6 +344,12 @@ a {
     position: absolute;
     bottom: 0;
     right: 0;
+}
+
+.devCtrls .btnSub {
+    position: absolute;
+    bottom: 0;
+    left: 0;
 }
 
 
