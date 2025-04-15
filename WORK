@@ -88,3 +88,13 @@ x * Sync room (on every start: reset all time offset, on play Playlist, triggers
 - Backup / Restore JSON
 - Standard movie weight: 2Mo/s 240Mo 1500px width  
 
+
+**************
+FRAPPAZ
+**************
+
+- CONTROL: room delete : BROKEN....
+- on new room -> create media folder
+- CONTROL: Button Media list Reload
+- CONTROL: Button Server Restart 
+- CONTROL: snap status (check if snap are ok for all devices)

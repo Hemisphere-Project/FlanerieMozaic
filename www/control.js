@@ -9,8 +9,14 @@ socket.on('connect', () => {
     socket.emit('rooms?')
 })
 
+socket.on('reload', () => {
+    console.log('reload')
+    location.reload()
+})
+
 // Rooms list
 socket.on('rooms', (data) => {
+    console.log('rooms', data)
     $('#rooms').empty()
 
     // clear previous rooms
@@ -86,6 +92,15 @@ socket.on('rooms', (data) => {
             for (let r of synced_rooms) r.player.playlist.reload() 
             socket.emit('playsync', ROOMS.filter(r => r.player.playlist.loop != LOOP_NONE).map(r => r.room))
         })
+
+        let rctrl = $('<div class="roomctrl">').appendTo(rdiv)
+        // Delete room button
+        // $('<button>').text('delete room').addClass('btn btn-delete')
+        //     .appendTo(rctrl).click(() => {
+        //         if (!confirm('Are you sure you want to delete this room?')) return
+        //         // redirect to delete page
+        //         window.location.href = '/deleteRoom/'+ROOMS[k].socket.room
+        //     })
     }
 })
 

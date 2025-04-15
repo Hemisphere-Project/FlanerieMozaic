@@ -510,17 +510,26 @@ app.get(['/qr', '/qrcode'], function(req, res) {
   res.sendFile(__dirname + '/www/qr.html');
 });
 
-app.get('/mapping/:room?', function(req, res) {
+app.get('/mapping/:room', function(req, res) {
   res.sendFile(__dirname + '/www/mapping.html');
+});
+
+app.get('/mapping', function(req, res) {
+  res.redirect('/control');
 });
 
 app.get('/control', function(req, res) {
   res.sendFile(__dirname + '/www/control.html');
 });
 
-app.get('/:room?', function(req, res) {
+app.get('/:room', function(req, res) {
   res.sendFile(__dirname + '/www/index.html');
 });
+
+app.get('/', function(req, res) {
+  res.redirect('/control');
+});
+
 
 
 

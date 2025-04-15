@@ -2,45 +2,45 @@
   "rooms": {
     "screen1": {
       "state": {
-        "offsetTime": 993.843755207,
-        "media": "screen1/0_small.mp4",
-        "lastmedia": "screen1/0_small.mp4",
+        "offsetTime": 36.233560915,
+        "media": "",
+        "lastmedia": "screen1/mire.mp4",
         "mediainfo": {
-          "hash": "a3ac7ddabb263c2d00b73e8177d15c8d",
-          "zoom": 3.0000000000000018,
+          "hash": "5ba34f2cf706e939fd08ae09713d6042",
+          "zoom": 1.3000000000000003,
           "offset": {
             "x": 0,
             "y": 0
           },
-          "name": "0_small",
+          "name": "mire",
           "submedias": [
-            "225oqeb7myl5l3jnalcqyc.mp4"
+            "mycustomid.mp4"
           ],
-          "filepath": "screen1/0_small.mp4",
-          "subfolder": "screen1/0_small",
-          "file": "0_small.mp4",
+          "filepath": "screen1/mire.mp4",
+          "subfolder": "screen1/mire",
+          "file": "mire.mp4",
           "resolution": {
-            "x": 560,
-            "y": 320
+            "x": 1920,
+            "y": 1080
           }
         },
         "paused": false,
         "ctrls": true,
-        "master": "_mapping-1p7y9eo03fi"
+        "master": "_control-l62w6ndpkqd-0"
       },
       "devices": {
-        "225oqeb7myl5l3jnalcqyc": {
-          "uuid": "225oqeb7myl5l3jnalcqyc",
+        "mycustomid": {
+          "uuid": "mycustomid",
           "position": {
-            "x": -1123,
-            "y": -572
+            "x": -1482,
+            "y": -584
           },
           "resolution": {
-            "x": 1439,
-            "y": 1085
+            "x": 1862,
+            "y": 1133
           },
           "zoomdevice": 2,
-          "alive": true,
+          "alive": false,
           "selected": false,
           "mode": "new",
           "volume": 0
@@ -48,47 +48,50 @@
       },
       "random": 0.15573521424568315
     },
-    "default": {
+    "screen2": {
       "state": {
-        "offsetTime": 36.87404749,
+        "offsetTime": 36.233293538,
         "media": "",
-        "lastmedia": "default/0_small.mp4",
+        "lastmedia": "screen2/mire.mp4",
         "mediainfo": {
-          "hash": "a3ac7ddabb263c2d00b73e8177d15c8d",
-          "zoom": 1.1,
+          "hash": "5ba34f2cf706e939fd08ae09713d6042",
+          "name": "mire",
+          "file": "mire.mp4",
+          "zoom": 1,
           "offset": {
             "x": 0,
             "y": 0
           },
-          "name": "0_small",
-          "submedias": [],
-          "filepath": "default/0_small.mp4",
-          "subfolder": "default/0_small",
-          "file": "0_small.mp4",
           "resolution": {
-            "x": 560,
-            "y": 320
-          }
+            "x": 1920,
+            "y": 1080
+          },
+          "filepath": "screen2/mire.mp4",
+          "subfolder": "screen2/mire",
+          "submedias": [
+            "super.mp4"
+          ]
         },
         "paused": false,
-        "ctrls": false,
-        "master": "_control-l8py3o3s1ik-1"
+        "ctrls": true,
+        "master": "_control-l62w6ndpkqd-1"
       },
       "devices": {
-        "225oqeb7myl5l3jnalcqyc": {
-          "uuid": "225oqeb7myl5l3jnalcqyc",
+        "super": {
+          "uuid": "super",
           "position": {
-            "x": 260,
-            "y": 372
+            "x": -326,
+            "y": -78
           },
           "resolution": {
-            "x": 1187,
-            "y": 965
+            "x": 1242,
+            "y": 938
           },
           "zoomdevice": 1,
           "alive": false,
           "selected": false,
-          "mode": "new"
+          "mode": "new",
+          "volume": 0
         }
       }
     }
