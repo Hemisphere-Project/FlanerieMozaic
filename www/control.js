@@ -95,12 +95,11 @@ socket.on('rooms', (data) => {
 
         let rctrl = $('<div class="roomctrl">').appendTo(rdiv)
         // Delete room button
-        // $('<button>').text('delete room').addClass('btn btn-delete')
-        //     .appendTo(rctrl).click(() => {
-        //         if (!confirm('Are you sure you want to delete this room?')) return
-        //         // redirect to delete page
-        //         window.location.href = '/deleteRoom/'+ROOMS[k].socket.room
-        //     })
+        $('<button>').text('delete room').addClass('btn btn-delete')
+            .appendTo(rctrl).click(() => {
+                if (!confirm('Are you sure you want to delete this room?')) return
+                socket.emit('deleteroom', room.room)
+            })
     }
 })
 
@@ -121,6 +120,17 @@ $('#stopsync').click(() => {
 $('#listsync').click(() => {
     for(let k in ROOMS) ROOMS[k].player.playlist.load(ROOMS[k].videolist, LOOP_ALL)
     socket.emit('playsync')
+})
+
+$('#newroom').click(() => {
+    let name = prompt('Enter new room name:')
+    if (!name) return
+    socket.emit('newroom', name)
+})
+
+$('#mediaload').click(() => {
+    socket.emit('mediaload')
+    $('#mediaload_overlay').show()
 })
 
 

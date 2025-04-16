@@ -4,126 +4,147 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import ffmpeg from 'fluent-ffmpeg';
-import { exec, execSync } from 'child_process';
-import 'dotenv/config';
-import { exit } from 'process';
-import e from 'express';
+import { execSync } from 'child_process';
 
-if (!'VIDEO_PATH' in process.env) { console.log('VIDEO_PATH not defined in .env'); exit(1); }
-
-// VIDEO_PATH contains a folder for each room.
-// In each room there is a list of videos and subfolders for each device
-// Each device subfolder contains a list of video re-encoded for the device with a given x,y,w,h specified in the filename
-// The original video is stored in the room folder
-// The re-encoded videos are stored in the device subfolder
-// The re-encoded videos are named as <original_video_name>_<x>_<y>_<w>_<h>.mp4
-// The re-encoded videos are created by cropping the original video to the specified x,y,w,h
+var MEDIA_FILE = null
+var VIDEO_PATH = null
 
 var MEDIA = {conf: null};
 
+MEDIA.loadroom = (room) => {
+    if (!MEDIA_FILE) throw new Error('MEDIA_FILE not set');
+    if (!VIDEO_PATH) throw new Error('VIDEO_PATH not set');
+    if (!fs.existsSync(VIDEO_PATH)) throw new Error('VIDEO_PATH does not exist: '+VIDEO_PATH);
+
+    if (!MEDIA.conf[room]) MEDIA.conf[room] = {};
+    if (!MEDIA.conf[room].medias) MEDIA.conf[room].medias = {}
+    const roomPath = path.join(VIDEO_PATH, room);
+
+    // Loading
+    console.log('MEDIA: loading', room, 'from', roomPath);
+    
+    // For each file in the room, get hash of the file and store it in the MEDIA.conf
+    const files = fs.readdirSync(roomPath).filter(file => fs.lstatSync(path.join(roomPath, file)).isFile());
+    files.forEach(file => {
+
+        // Loading
+        console.log('\t+ file', file, 'from', roomPath);
+
+        // add file
+        const name = file.split('.').slice(0, -1).join('.');
+        const filepath = path.join(room, file);
+        const filepath_full = path.join(VIDEO_PATH, filepath);
+        const subfolder = path.join(room, name);
+        const hash = crypto.createHash('md5').update(fs.readFileSync(filepath_full)).digest('hex');
+
+        if (!MEDIA.conf[room].medias[file]) MEDIA.conf[room].medias[file] = {'hash': hash};
+        
+        // hash changed -> remove the 'filename' subfolder
+        if (MEDIA.conf[room].medias[file].hash !== hash) {
+            MEDIA.conf[room].medias[file].hash = hash;
+            MEDIA.conf[room].medias[file].resolution = { x: 0, y: 0 };
+            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
+        }
+    })
+
+    // Default values 
+    for (let room in MEDIA.conf) {
+        for (let media in MEDIA.conf[room].medias) {
+            let m = MEDIA.conf[room].medias[media];
+            if (!m.name)        m.name = media.split('.').slice(0, -1).join('.');
+            if (!m.file)        m.file = media;
+            if (!m.hash)        m.hash = '';
+            if (!m.zoom)        m.zoom = 1.0;
+            if (!m.offset)      m.offset = {x: 0, y: 0};
+            if (!m.resolution)  m.resolution = {x: 0, y: 0};
+            if (!m.filepath)    m.filepath = path.join(room, m.file);
+            if (!m.subfolder)   m.subfolder = path.join(room, m.name);
+            if (!m.submedias)   m.submedias = [];
+        }
+    }
+
+    // For each media in the room, check if the media is in the folder
+    for (let media in MEDIA.conf[room].medias) {
+
+        const subfolder = path.join(VIDEO_PATH, MEDIA.conf[room].medias[media].subfolder);
+
+        // if the media is not in the folder, remove it from the MEDIA.conf
+        // and remove the 'filename' subfolder
+        if (!files.includes(media)) {
+            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
+            delete MEDIA.conf[room].medias[media];
+            continue
+        }
+
+        // media eixsts but the 'filename' subfolder does not exist
+        // -> create it
+        if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder);
+
+        // Update sub-media list (list of medias in the 'filename' subfolder)
+        const subfiles = fs.readdirSync(subfolder).filter(file => fs.lstatSync(path.join(subfolder,  file)).isFile());
+        MEDIA.conf[room].medias[media].submedias = [];
+        subfiles.forEach(file => {
+            MEDIA.conf[room].medias[media].submedias.push(file);
+        })
+    }
+
+    // For each media check and detect resolution
+    for (let media in MEDIA.conf[room].medias) {
+        const filepath = path.join(VIDEO_PATH, MEDIA.conf[room].medias[media].filepath);
+        const subfolder = path.join(VIDEO_PATH, MEDIA.conf[room].medias[media].subfolder);
+        ffmpeg.ffprobe(filepath, (err, metadata) => {
+            if (err) console.log('ffprobe error', err);
+            if (metadata && metadata.streams && metadata.streams.length > 0) {
+                MEDIA.conf[room].medias[media].resolution.x = metadata.streams[0].width;
+                MEDIA.conf[room].medias[media].resolution.y = metadata.streams[0].height;
+            }
+        });
+    }
+}
+
+
 // Get previous media configuration from media.json
 MEDIA.load = () => {
-    const mediaPath = path.join(process.env.VIDEO_PATH, 'media.json');
-    if (!fs.existsSync(mediaPath)) MEDIA.conf = {};
-    else MEDIA.conf = JSON.parse(fs.readFileSync(mediaPath));
+    console.log()
+    if (!MEDIA_FILE) throw new Error('MEDIA_FILE not set');
+    if (!VIDEO_PATH) throw new Error('VIDEO_PATH not set');
+    if (!fs.existsSync(VIDEO_PATH)) throw new Error('VIDEO_PATH does not exist: '+VIDEO_PATH);
+
+    if (!fs.existsSync(MEDIA_FILE)) MEDIA.conf = {};
+    else MEDIA.conf = JSON.parse(fs.readFileSync(MEDIA_FILE));
 
     // For each folder (room) in VIDEO_PATH, for each file in the folder, 
     // get hash of the file and store it in the MEDIA.conf. 
     // 'filename' subfolder contains the re-encoded videos for the devices
-    const rooms = fs.readdirSync(process.env.VIDEO_PATH).filter(file => fs.lstatSync(path.join(process.env.VIDEO_PATH, file)).isDirectory());
-    rooms.forEach(room => {
-        if (!MEDIA.conf[room]) MEDIA.conf[room] = {};
-        if (!MEDIA.conf[room].medias) MEDIA.conf[room].medias = {}
-        const roomPath = path.join(process.env.VIDEO_PATH, room);
-        
-        // For each file in the room, get hash of the file and store it in the MEDIA.conf
-        const files = fs.readdirSync(roomPath).filter(file => fs.lstatSync(path.join(roomPath, file)).isFile());
-        files.forEach(file => {
-
-            // add file
-            const name = file.split('.').slice(0, -1).join('.');
-            const filepath = path.join(room, file);
-            const filepath_full = path.join(process.env.VIDEO_PATH, filepath);
-            const subfolder = path.join(room, name);
-            const hash = crypto.createHash('md5').update(fs.readFileSync(filepath_full)).digest('hex');
-
-            if (!MEDIA.conf[room].medias[file]) MEDIA.conf[room].medias[file] = {'hash': hash};
-            
-            // hash changed -> remove the 'filename' subfolder
-            if (MEDIA.conf[room].medias[file].hash !== hash) {
-                MEDIA.conf[room].medias[file].hash = hash;
-                MEDIA.conf[room].medias[file].resolution = { x: 0, y: 0 };
-                if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
-            }
-        })
-
-        // Default values 
-        for (let room in MEDIA.conf) {
-            for (let media in MEDIA.conf[room].medias) {
-                let m = MEDIA.conf[room].medias[media];
-                if (!m.name)        m.name = media.split('.').slice(0, -1).join('.');
-                if (!m.file)        m.file = media;
-                if (!m.hash)        m.hash = '';
-                if (!m.zoom)        m.zoom = 1.0;
-                if (!m.offset)      m.offset = {x: 0, y: 0};
-                if (!m.resolution)  m.resolution = {x: 0, y: 0};
-                if (!m.filepath)    m.filepath = path.join(room, m.file);
-                if (!m.subfolder)   m.subfolder = path.join(room, m.name);
-                if (!m.submedias)   m.submedias = [];
-            }
-        }
-
-        // For each media in the room, check if the media is in the folder
-        for (let media in MEDIA.conf[room].medias) {
-
-            const subfolder = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[media].subfolder);
-
-            // if the media is not in the folder, remove it from the MEDIA.conf
-            // and remove the 'filename' subfolder
-            if (!files.includes(media)) {
-                if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
-                delete MEDIA.conf[room].medias[media];
-                continue
-            }
-
-            // media eixsts but the 'filename' subfolder does not exist
-            // -> create it
-            if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder);
-
-            // Update sub-media list (list of medias in the 'filename' subfolder)
-            const subfiles = fs.readdirSync(subfolder).filter(file => fs.lstatSync(path.join(subfolder,  file)).isFile());
-            MEDIA.conf[room].medias[media].submedias = [];
-            subfiles.forEach(file => {
-                MEDIA.conf[room].medias[media].submedias.push(file);
-            })
-        }
-
-        // For each media check and detect resolution
-        for (let media in MEDIA.conf[room].medias) {
-            const filepath = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[media].filepath);
-            const subfolder = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[media].subfolder);
-            ffmpeg.ffprobe(filepath, (err, metadata) => {
-                if (err) console.log('ffprobe error', err);
-                if (metadata && metadata.streams && metadata.streams.length > 0) {
-                    MEDIA.conf[room].medias[media].resolution.x = metadata.streams[0].width;
-                    MEDIA.conf[room].medias[media].resolution.y = metadata.streams[0].height;
-                }
-            });
-        }
-    })
-
+    const rooms = fs.readdirSync(VIDEO_PATH).filter(file => fs.lstatSync(path.join(VIDEO_PATH, file)).isDirectory());
+    rooms.forEach(room => { MEDIA.loadroom(room); })
     MEDIA.save();
-    console.log('MEDIA', JSON.stringify(MEDIA.conf, null, 4));
+    // console.log('MEDIA', JSON.stringify(MEDIA.conf, null, 4));
 }
 
+MEDIA.addRoom = (room) => {
+    if (!MEDIA_FILE) throw new Error('MEDIA_FILE not set');
+    if (!VIDEO_PATH) throw new Error('VIDEO_PATH not set');
+    if (!fs.existsSync(VIDEO_PATH)) throw new Error('VIDEO_PATH does not exist: '+VIDEO_PATH);
+
+    // create folder
+    const roomPath = path.join(VIDEO_PATH, room);
+    if (!fs.existsSync(roomPath)) fs.mkdirSync(roomPath);
+
+    MEDIA.loadroom(room);
+    MEDIA.save();
+}
+
+
 MEDIA.save = () => {
-    fs.writeFileSync(path.join(process.env.VIDEO_PATH, 'media.json'), JSON.stringify(MEDIA.conf, null, 4));
+    if (!MEDIA_FILE) throw new Error('MEDIA_FILE not set');
+    fs.writeFileSync(MEDIA_FILE, JSON.stringify(MEDIA.conf, null, 4));
     // console.log('MEDIA', JSON.stringify(MEDIA.conf, null, 4));
 }
 
 // Get the list of videos in a room
 MEDIA.medialist = (room) => {
-    // const roomPath = path.join(process.env.VIDEO_PATH, room);
+    // const roomPath = path.join(VIDEO_PATH, room);
     // if (!fs.existsSync(roomPath)) return [];
     // return fs.readdirSync(roomPath).filter(file => 
     //     fs.lstatSync(path.join(roomPath, file)).isFile()
@@ -147,7 +168,7 @@ MEDIA.configure = function (media, key, value) {
     MEDIA.conf[room].medias[video][key] = value;
 
     // Media conf changed: destroy submedias folder and recreate
-    const subfolder = path.join(process.env.VIDEO_PATH, MEDIA.conf[room].medias[video].subfolder);
+    const subfolder = path.join(VIDEO_PATH, MEDIA.conf[room].medias[video].subfolder);
     if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder, {recursive: true});
     fs.mkdirSync(subfolder);
     MEDIA.conf[room].medias[video].submedias = [];
@@ -161,7 +182,7 @@ MEDIA.devicechanged = function (uuid, room) {
     let didchange = false;
     for (let m in MEDIA.conf[room].medias) {
         const media = MEDIA.conf[room].medias[m];
-        const submedia = path.join(process.env.VIDEO_PATH, media.subfolder, uuid + '.mp4');
+        const submedia = path.join(VIDEO_PATH, media.subfolder, uuid + '.mp4');
         if (fs.existsSync(submedia)) {
             fs.unlinkSync(submedia);
             didchange = true;
@@ -190,7 +211,7 @@ MEDIA.unsnap = function (device, media) {
     if (!media || !media.filepath) return
     if (!device || !device.uuid) return
 
-    const subfolder = path.join(process.env.VIDEO_PATH, media.subfolder);
+    const subfolder = path.join(VIDEO_PATH, media.subfolder);
     const submedia = path.join(subfolder, device.uuid + '.mp4');
 
     // Delete the submedia if it exists
@@ -210,9 +231,9 @@ MEDIA.snap = function(device, media) {
         if (!media || !media.filepath) return reject('Media not found');
         if (!device || !device.uuid) return reject('Device not found');
 
-        const subfolder = path.join(process.env.VIDEO_PATH, media.subfolder);
+        const subfolder = path.join(VIDEO_PATH, media.subfolder);
         const submedia = path.join(subfolder, device.uuid + '.mp4');
-        const filepath = path.join(process.env.VIDEO_PATH, media.filepath);
+        const filepath = path.join(VIDEO_PATH, media.filepath);
 
         // Delete the submedia if it exists
         if (fs.existsSync(submedia)) fs.unlinkSync(submedia);
@@ -286,7 +307,11 @@ MEDIA.snap = function(device, media) {
 
 }
 
-function getMediaManager() {
+function getMediaManager(mediafile, videopath) {
+
+    if (mediafile) MEDIA_FILE = path.resolve(mediafile);
+    if (videopath) VIDEO_PATH = path.resolve(videopath);
+
     if (!MEDIA.conf) MEDIA.load()
     return MEDIA;
 }

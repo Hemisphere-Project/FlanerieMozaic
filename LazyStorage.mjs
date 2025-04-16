@@ -25,6 +25,7 @@ class LazyStorage {
 
   load() {
     try {
+      console.log("STORE loading from: ", this.filePath)
       const data = readFileSync(this.filePath, 'utf8');
       return JSON.parse(data);
     } catch (error) {
@@ -43,7 +44,7 @@ class LazyStorage {
       const jsonString = JSON.stringify(this._data, null, 2);
       writeFileSync(this.filePath, jsonString);
       // console.log(` = LS: Successfully saved data to ${this.filePath}`);
-      console.log(` = LS: saved`);
+      // console.log(` = LS: saved`);
     } catch (error) {
       console.error(` = LS: Error saving JSON to ${this.filePath}:`, error);
     }

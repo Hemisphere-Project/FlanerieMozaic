@@ -21,7 +21,9 @@ const urlParams = new URLSearchParams(window.location.search);
 
 // UUID
 //
-var UUID = urlParams.get('uuid') || Cookies.get('uuid') || Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+var UUID = urlParams.get('uuid') || Cookies.get('uuid')
+let urlargs = window.location.href.split('?')[1]
+if (urlargs && !urlargs.includes('=')) UUID = urlargs
 if (!UUID || UUID == 0) UUID = Math.random().toString(36).substring(2, 15)
 Cookies.set('uuid', UUID, { expires: 3700 })
 $('#uuid').text(UUID)
@@ -47,6 +49,13 @@ socket.on('hello', () => {
     console.log('========= connected ===========')
     updateSize()
 });
+
+socket.on('no-room', () => {
+    console.log('========= no room ===========')
+    alert('This room does not exist. Please create it first !')
+    // reload
+    location.reload()
+})
 
 socket.on('devices', (data) => {
     console.log('devices', data)

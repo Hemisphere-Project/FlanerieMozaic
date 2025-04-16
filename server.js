@@ -12,15 +12,34 @@ import { info } from 'console';
 const __dirname = new URL('.', import.meta.url).pathname;
 
 if (!'PORT' in process.env) process.env.PORT = 5000;
-if (!'VIDEO_PATH' in process.env) process.env.VIDEO_PATH = './www/video';
-if (!'STORE_FILE' in process.env) process.env.STORE_FILE = './torage/store.json';
+if (!'VIDEO_PATH' in process.env) { console.log('VIDEO_PATH not defined in .env'); exit(1); }
+if (!'STORE_FILE' in process.env) process.env.STORE_FILE = './storage/devices.json';
+if (!'MEDIA_FILE' in process.env) process.env.MEDIA_FILE = './storage/media.json';
 
-console.log("\n === Flanerie Mozaic Server === \n")
+const STORE_FILE = path.resolve(process.env.STORE_FILE);
+const MEDIA_FILE = path.resolve(process.env.MEDIA_FILE);
+const VIDEO_PATH = path.resolve(process.env.VIDEO_PATH);
 
-const STORE = LazyStorage(process.env.STORE_FILE);
-const MEDIA = MediaManager();
+console.log("                                                                                ")
+console.log("                                                                                ")
+console.log("░▒▓██████████████▓▒░ ░▒▓██████▓▒░░▒▓████████▓▒░░▒▓██████▓▒░░▒▓█▓▒░░▒▓██████▓▒░  ")
+console.log("░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░      ░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ")
+console.log("░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░    ░▒▓██▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░▒▓█▓▒░        ")
+console.log("░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░  ░▒▓██▓▒░  ░▒▓████████▓▒░▒▓█▓▒░▒▓█▓▒░        ")
+console.log("░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░░▒▓██▓▒░    ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░▒▓█▓▒░        ")
+console.log("░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░▒▓█▓▒░░▒▓█▓▒░ ")
+console.log("░▒▓█▓▒░░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░░▒▓████████▓▒░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░░▒▓██████▓▒░  ")
+console.log("                                                                                ")
+console.log("                                                                                ")
 
-console.log("Loading STORE from: ", process.env.STORE_FILE)
+console.log('STORE_FILE', STORE_FILE);
+console.log('MEDIA_FILE', MEDIA_FILE);
+console.log('VIDEO_PATH', VIDEO_PATH);
+console.log('PORT', process.env.PORT);
+console.log()
+
+const STORE = LazyStorage(STORE_FILE);
+const MEDIA = MediaManager(MEDIA_FILE, VIDEO_PATH);
 
 var app = express();
 var server = HttpServer(app);
@@ -35,6 +54,7 @@ const defaultState = {
   mediainfo: {},
   paused: false,
   ctrls: false,
+  valid: false
 }
 
 const defaultDevice = {
@@ -43,6 +63,7 @@ const defaultDevice = {
   zoomdevice: 1.0,
   alive: false,
   selected: false,
+  volume: 0.0,
   mode: 'new' // new, fixed, guest
 }
 
@@ -52,8 +73,7 @@ if (!ROOMS) ROOMS = STORE.rooms = {};
 
 function room(roomid) {
   if (typeof roomid === 'object' && !Array.isArray(roomid) && roomid !== null && 'room' in roomid) roomid = roomid.room;  // allow to pass entire socket object
-  if (!roomid) roomid = 'default';
-  if (!STORE.rooms[roomid]) STORE.rooms[roomid] = {state: Object.assign({}, defaultState), devices: {}};
+  if (!roomid || !STORE.rooms[roomid]) return {state: Object.assign({}, defaultState), devices: {}};
   return STORE.rooms[roomid];
 }
 
@@ -181,7 +201,7 @@ io.on('connection', (socket) =>
   //
 
   // Client is ready to receive initial data
-  socket.on('hi', (uuid, room, reso) => 
+  socket.on('hi', (uuid, roomid, reso) => 
   {
     uuid = String(uuid).trim();
     if (uuid === '') {
@@ -190,25 +210,29 @@ io.on('connection', (socket) =>
       return;
     }
 
-    if (room === undefined) room = 'default';
+    // invalid room
+    if (!roomid || !room(roomid).valid) {
+      socket.emit('no-room');
+      return;
+    }
 
     socket.uuid = uuid;
-    socket.room = room;
-    socket.join(room);
+    socket.room = roomid;
+    socket.join(roomid);
     socket.join(uuid);
 
     if (uuid.startsWith('_')) {
       // console.log('anonymous player connected');
     }
     else {
-      // console.log('device connected', uuid, room);
+      // console.log('device connected', uuid, roomid);
 
-      let dev = bootstrapDevice(uuid, room, reso);
+      let dev = bootstrapDevice(uuid, roomid, reso);
       
       // if new, try to move to a dead guest
       if (dev.mode === 'new') {
-        for (let uuid in STORE.rooms[room].devices) {
-          if (device(uuid,room).mode === 'guest' && !device(uuid,room).alive) {
+        for (let uuid in STORE.rooms[roomid].devices) {
+          if (device(uuid,roomid).mode === 'guest' && !device(uuid,roomid).alive) {
             io.to(uuid).emit('setname', guestid);
             break;
           }
@@ -216,9 +240,9 @@ io.on('connection', (socket) =>
       }
     }
 
-    infoDevices(room);
-    infoState(room, uuid);
-    infoMedialist(room, uuid);
+    infoDevices(roomid);
+    infoState(roomid, uuid);
+    infoMedialist(roomid, uuid);
   })
 
   // Configure media
@@ -454,6 +478,31 @@ io.on('connection', (socket) =>
   // CROSS-ROOM
   //
 
+  socket.on('newroom', (roomid) => {
+    if (!roomid) return
+    if (ROOMS[roomid]) return
+    console.log('new room', roomid);
+    STORE.rooms[roomid] = {state: Object.assign({}, defaultState), devices: {}};
+    STORE.rooms[roomid].valid = true;
+    STORE._save();
+    MEDIA.addRoom(roomid);
+    socket.emit('reload');
+  })
+
+  socket.on('deleteroom', (roomid) => {
+    if (!roomid) return
+    if (!ROOMS[roomid]) return
+    console.log('delete room', roomid);
+    delete STORE.rooms[roomid];
+    STORE._save();
+    socket.emit('reload');
+  })
+
+  socket.on('mediaload', () => {
+    MEDIA.load()
+    socket.emit('reload');
+  })
+
   socket.on('rooms?', () => {
     // answer is a list of 
     // { room: 'room1', videos: ['video1', 'video2', ...] }
@@ -503,7 +552,7 @@ io.on('connection', (socket) =>
 //
 
 server.listen(process.env.PORT, function() {
-  console.log('listening on *:' + process.env.PORT);
+  console.log('\nSERVER: listening on *:' + process.env.PORT);
 });
 
 app.get(['/qr', '/qrcode'], function(req, res) {
@@ -522,8 +571,14 @@ app.get('/control', function(req, res) {
   res.sendFile(__dirname + '/www/control.html');
 });
 
-app.get('/:room', function(req, res) {
-  res.sendFile(__dirname + '/www/index.html');
+app.get(['/ply/:room', '/p/:room', '/player/:room'], function(req, res) {
+  let roomid = req.params.room;
+  console.log('ply', roomid);
+  if (!roomid || !ROOMS[roomid]) {
+    // send text "This room does not exist"
+    res.status(404).send('This room does not exist');
+  }
+  else res.sendFile(__dirname + '/www/index.html');
 });
 
 app.get('/', function(req, res) {
@@ -535,4 +590,4 @@ app.get('/', function(req, res) {
 
 // Serve static files /static
 app.use('/static', express.static('www'));
-app.use('/media', express.static(process.env.VIDEO_PATH));
+app.use('/media', express.static(VIDEO_PATH));
