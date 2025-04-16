@@ -35,7 +35,11 @@ MEDIA.loadroom = (room) => {
         const filepath = path.join(room, file);
         const filepath_full = path.join(VIDEO_PATH, filepath);
         const subfolder = path.join(room, name);
-        const hash = crypto.createHash('md5').update(fs.readFileSync(filepath_full)).digest('hex');
+        // const hash = crypto.createHash('md5').update(fs.readFileSync(filepath_full)).digest('hex');
+
+        // create hash from date and size
+        const stats = fs.statSync(filepath_full);
+        const hash = crypto.createHash('md5').update(stats.mtime.toString() + stats.size.toString()).digest('hex');
 
         if (!MEDIA.conf[room].medias[file]) MEDIA.conf[room].medias[file] = {'hash': hash};
         
