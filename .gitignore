@@ -1,6 +1,8 @@
 .DS_Store
 .env
 
+storage/*.json
+
 # Logs
 logs
 *.log
