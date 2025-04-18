@@ -100,6 +100,13 @@ socket.on('rooms', (data) => {
                 if (!confirm('Are you sure you want to delete this room?')) return
                 socket.emit('deleteroom', room.room)
             })
+
+        // triggers infostate button
+        $('<button>').text('infostate').addClass('btn btn-infostate')
+            .appendTo(rctrl).click(() => {
+                ROOMS[k].socket.emit('infostate')
+            })
+        
     }
 })
 

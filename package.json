@@ -14,6 +14,7 @@
   "license": "GPL-3.0",
   "dependencies": {
     "@ircam/sync": "^2.1.0",
+    "blocked-at": "^1.2.0",
     "conf": "^12.0.0",
     "dotenv": "^16.4.5",
     "express": "^4.18.2",

@@ -3,13 +3,20 @@ import { SyncServer } from '@ircam/sync'
 import { Server as HttpServer } from 'http';
 import { Server as IoServer } from "socket.io";
 import Conf from 'conf';
-import fs from 'fs';
+// import fs from 'fs';
+import fs from 'fs/promises';
 import 'dotenv/config'
 import path from 'path';
 import MediaManager from './MediaManager.js';
 import LazyStorage from './LazyStorage.mjs';
 import { info } from 'console';
 const __dirname = new URL('.', import.meta.url).pathname;
+
+// const blocked = require('blocked-at');
+import blocked from 'blocked-at';
+blocked((time, stack) => {
+  console.log(`!!!!! Blocked for ${time}ms at:\n${stack}`);
+}, { threshold: 100 }); // Alert if blocked >100ms
 
 if (!'PORT' in process.env) process.env.PORT = 5000;
 if (!'VIDEO_PATH' in process.env) { console.log('VIDEO_PATH not defined in .env'); exit(1); }
@@ -399,6 +406,14 @@ io.on('connection', (socket) =>
     infoState(socket.room);
   })
 
+  // Infostate
+  socket.on('infostate', () => 
+  {
+    if (!checkSocket(socket)) return;
+    infoState(socket.room);
+    console.log('infostate', socket.room);
+  })
+
   // Load and play media
   socket.on('play', (media) => {
     if (!checkSocket(socket)) return;
@@ -443,20 +458,47 @@ io.on('connection', (socket) =>
     infoState(socket.room);
     var now = Date.now();
     
-    let allPromises = [];
-    for (let uuid in room(socket).devices) {
-      let dev = device(uuid, socket);
-      allPromises.push( MEDIA.snap(dev, media) )
-    }
 
-    Promise.all(allPromises)
-      .then(() => {
-        // wait at least 2s since now
-        setTimeout(() => {
-          infoMedialist(socket.room);
-          infoState(socket.room);
-        }, Math.max(2000 - (Date.now() - now), 0));
-      })
+    async function snapAll() {
+      for (let uuid in room(socket).devices) {
+        let dev = device(uuid, socket);
+        await MEDIA.snap(dev, media).then(() => {
+          // wait at least 2s since now
+          setTimeout(() => {
+            infoMedialist(socket.room);
+            infoState(socket.room);
+          }, Math.max(2000 - (Date.now() - now), 0));
+        })
+        .catch((err) => {
+          console.error('Error during snap', err);
+        })
+      }
+    } 
+
+    snapAll()
+
+    //
+    
+    // let allPromises = [];
+    // for (let uuid in room(socket).devices) {
+    //   let dev = device(uuid, socket);
+    //   allPromises.push( MEDIA.snap(dev, media) )
+    // }
+
+    
+    
+
+    // do each snap sequentially
+    // allPromises = allPromises.reduce((p, fn) => p.then(fn), Promise.resolve());
+
+    // Promise.all(allPromises)
+    //   .then(() => {
+    //     // wait at least 2s since now
+    //     setTimeout(() => {
+    //       infoMedialist(socket.room);
+    //       infoState(socket.room);
+    //     }, Math.max(2000 - (Date.now() - now), 0));
+    //   })
   })
   
   socket.on('state?', () => {
@@ -581,13 +623,76 @@ app.get(['/ply/:room', '/p/:room', '/player/:room'], function(req, res) {
   else res.sendFile(__dirname + '/www/index.html');
 });
 
-app.get('/', function(req, res) {
-  res.redirect('/control');
-});
+// app.get('/', function(req, res) {
+//   res.redirect('/control');
+// });
 
 
 
 
 // Serve static files /static
 app.use('/static', express.static('www'));
-app.use('/media', express.static(VIDEO_PATH));
+// app.use('/media', express.static(VIDEO_PATH));
+
+
+
+// const { createReadStream } = require('fs');
+import { createReadStream } from 'fs';
+
+// Security: Validate and sanitize file paths
+const sanitizePath = (userPath) => {
+  const relativePath = path.normalize(userPath).replace(/^(\.\.(\/|\\|$))+/, '');
+  return path.join(VIDEO_PATH, relativePath);
+};
+
+app.get('/media/*', async (req, res) => {
+  try {
+    const subPath = req.params[0]; // Captures everything after /media/
+    const fullPath = sanitizePath(subPath);
+    
+    // Verify the resolved path is within allowed directory
+    if (!fullPath.startsWith(path.resolve(VIDEO_PATH))) {
+      return res.status(403).send('Forbidden');
+    }
+
+    const stat = await fs.stat(fullPath);
+    
+    // Handle range requests (crucial for media streaming)
+    const range = req.headers.range;
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
+
+      if (start >= stat.size || end >= stat.size) {
+        res.status(416).header('Content-Range', `bytes */${stat.size}`).send();
+        return;
+      }
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${stat.size}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': end - start + 1,
+        'Content-Type': 'video/mp4',
+        'Cache-Control': 'public, max-age=31536000'
+      });
+
+      createReadStream(fullPath, { start, end }).pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Content-Length': stat.size,
+        'Content-Type': 'video/mp4',
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'public, max-age=31536000'
+      });
+      createReadStream(fullPath).pipe(res);
+    }
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      res.status(404).send('File not found');
+    } else {
+      console.error('Stream error:', error);
+      res.status(500).send('Server error');
+    }
+  }
+});

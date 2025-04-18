@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import ffmpeg from 'fluent-ffmpeg';
-import { execSync } from 'child_process';
+import { execSync, exec } from 'child_process';
 
 var MEDIA_FILE = null
 var VIDEO_PATH = null
@@ -75,7 +75,7 @@ MEDIA.loadroom = (room) => {
         // if the media is not in the folder, remove it from the MEDIA.conf
         // and remove the 'filename' subfolder
         if (!files.includes(media)) {
-            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
+            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder, {recursive: true});
             delete MEDIA.conf[room].medias[media];
             continue
         }
@@ -310,21 +310,25 @@ MEDIA.snap = function(device, media) {
         //                 "${submedia}"`;
 
         // Execute the command sync
-        try {
-            execSync(cmd, {stdio: 'inherit'});
-            console.log('\nsubmedia generated!', submedia, '\n')
 
-            // Push into submedias list
-            if (!media.submedias) media.submedias = [];
-            media.submedias.push(path.basename(submedia));
-            MEDIA.save();
+        // exec async
+        exec(cmd, {stdio: 'inherit'}, (error, stdout, stderr) => {
+            if (error) {
+                console.log('Error generating submedia', error);
+                reject(error);
+            }
+            else {
+                console.log('Submedia generated', submedia);
+                
+                // Push into submedias list
+                if (!media.submedias) media.submedias = [];
+                media.submedias.push(path.basename(submedia));
+                MEDIA.save();
+                
+                resolve();
+            }
+        });
             
-            resolve();
-        }
-        catch (err) {
-            console.log('Error generating submedia', err);
-            reject(err);
-        }
         
     })
 

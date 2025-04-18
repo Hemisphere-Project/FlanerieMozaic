@@ -23,6 +23,7 @@ class VideoPlayer extends EventEmitter {
         // the video element
         this.video = $('<video class="player draggable" playsinline></video>')
         this.video.attr('uuid', uuid)
+
         
         // Full backstage/stage/origin layered player
         //
@@ -179,7 +180,13 @@ class VideoPlayer extends EventEmitter {
                 this.video[0].srcObject.getTracks().forEach(track => track.stop());
                 this.video[0].srcObject = null
             }
-            this.video.attr('src', '/media/'+media)
+            let src = '/media/'+media
+            
+            // Dirty hack to serve media from NGINX on 10.0.0.1
+            if (window.location.href.indexOf('10.0.0.1') != -1) 
+                src = 'http://10.0.0.1:8888/'+media
+
+            this.video.attr('src', src)
             this.video[0].load()
             this.video[0].pause()
         }
