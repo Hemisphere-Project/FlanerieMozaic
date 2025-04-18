@@ -92,8 +92,8 @@ class VideoPlayer extends EventEmitter {
         }
         this.video.removeClass('maxiplayer')
         let scale = this._globalzoom * this._localzoom
-        let x = (this._localposition.x + this._globalposition.x) / scale
-        let y = (this._localposition.y + this._globalposition.y) / scale
+        let x = (this._localposition.x + this._globalposition.x * this._localzoom ) / scale
+        let y = (this._localposition.y + this._globalposition.y * this._localzoom) / scale
         this.video.css('transform', 'scale('+scale+') translate('+x+'px, '+y+'px)')
     }
         

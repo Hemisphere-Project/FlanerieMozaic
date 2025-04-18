@@ -266,8 +266,8 @@ MEDIA.snap = function(device, media) {
         const snapH = Math.round(Dh / zoom);
 
         // Target snap position
-        const snapX = Math.round( (Dx+Mx) / zoom );
-        const snapY = Math.round( (Dy+My) / zoom );
+        const snapX = Math.round( (Dx+Mx*Dz) / zoom );
+        const snapY = Math.round( (Dy+My*Dz) / zoom );
 
         // Padding (off media area of snap)
         const padLeft = Math.max(0, -1 * snapX);
@@ -282,6 +282,16 @@ MEDIA.snap = function(device, media) {
         // Crop position (media area of snap)
         const cropX = Math.max(0, snapX);
         const cropY = Math.max(0, snapY);
+
+        // Find the smallest standard resolution that fits the snap [240p, 360p, 480p, 720p, 1080p]
+        // const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720], [1920, 1080]];
+        // for (let i = 0; i < resolutions.length; i++) {
+        //     if (resolutions[i][0] >= snapW && resolutions[i][1] >= snapH) {
+        //         snapW = resolutions[i][0];
+        //         snapH = resolutions[i][1];
+        //         break;
+        //     }
+        // }
 
         // Build simplified FFmpeg command
         const cmd = `ffmpeg -i "${filepath}" \
