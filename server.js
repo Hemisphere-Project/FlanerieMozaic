@@ -114,9 +114,9 @@ for (let room in STORE.rooms) {
 // Create a new device entry if it doesn't exist
 function bootstrapDevice(uuid, room, reso) {
   if (uuid === undefined) return;
-  if (room === undefined) room = 'default';
+  if (room === undefined) return;
 
-  let dev = device(uuid, room);
+  var dev = device(uuid, room);
 
   if (reso) {
     dev.resolution = reso;
@@ -256,7 +256,7 @@ io.on('connection', (socket) =>
   socket.on('deviceconf', (key, val, uuid) => {
     if (!checkSocket(socket)) return;
     uuid = uuid || socket.uuid;
-    bootstrapDevice(uuid, socket.room)[key] = val; 
+    device(uuid, socket.room)[key] = val; 
     
     let dc = false
     if (key === 'position' || key === 'zoomdevice')
@@ -350,7 +350,7 @@ io.on('connection', (socket) =>
     let dc = false;
     uuid = uuid || socket.uuid;
     // console.log('move', uuid, socket.room, delta);
-    var dev = bootstrapDevice(uuid, socket.room);
+    var dev = device(uuid, socket.room);
     dev.position.x += delta.x;
     dev.position.y += delta.y;
 

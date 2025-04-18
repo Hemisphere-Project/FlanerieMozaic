@@ -17,7 +17,7 @@ class SyncPlayer extends VideoPlayer {
     this._updateTimer = null;
     this._refreshInterval = 20;  // 250
     this._correctionTime = 5000;  // 5000
-    this._seekThreshold = 400;    // 400
+    this._seekThreshold = 1000;    // 400
 
     // websocket (socket.io)
     this.socket = socket;
@@ -146,7 +146,8 @@ class SyncPlayer extends VideoPlayer {
 
     // console.log('targetTime', targetTime, 'currentTime', currentTime, 'diff', diff, 'rate', rate);
 
-    if (rate < 0.97 || rate > 1.03 || Math.abs(diff) >= this._seekThreshold/1000) {
+    // if (rate < 0.97 || rate > 1.03 || Math.abs(diff) >= this._seekThreshold/1000) {
+    if (rate < 0.95 || rate > 1.3 || Math.abs(diff) >= this._seekThreshold/1000) {
       this.element.currentTime = targetTime;
       this.element.playbackRate = 1.01; // this.remote.playbackRate;
       // console.log('seeking', Math.round(diff*100)/100);
