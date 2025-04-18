@@ -86,15 +86,17 @@ class VideoPlayer extends EventEmitter {
     // video css
     setvideocss() {
         if (this.submediaplayback) {
-            this.video.css('transform', 'scale(1) translate(0px, 0px)')
             this.video.addClass('maxiplayer')
-            return
+            let scale = this._globalzoom* this._localzoom
+            this.video.css('transform', 'scale('+scale+') translate( 0px, 0px)')
         }
-        this.video.removeClass('maxiplayer')
-        let scale = this._globalzoom * this._localzoom
-        let x = (this._localposition.x + this._globalposition.x * this._localzoom ) / scale
-        let y = (this._localposition.y + this._globalposition.y * this._localzoom) / scale
-        this.video.css('transform', 'scale('+scale+') translate('+x+'px, '+y+'px)')
+        else {
+            this.video.removeClass('maxiplayer')
+            let scale = this._globalzoom * this._localzoom
+            let x = (this._localposition.x + this._globalposition.x * this._localzoom ) / scale
+            let y = (this._localposition.y + this._globalposition.y * this._localzoom) / scale
+            this.video.css('transform', 'scale('+scale+') translate('+x+'px, '+y+'px)')
+        }
     }
         
 

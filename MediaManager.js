@@ -284,18 +284,21 @@ MEDIA.snap = function(device, media) {
         const cropY = Math.max(0, snapY);
 
         // Find the smallest standard resolution that fits the snap [240p, 360p, 480p, 720p, 1080p]
-        // const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720], [1920, 1080]];
-        // for (let i = 0; i < resolutions.length; i++) {
-        //     if (resolutions[i][0] >= snapW && resolutions[i][1] >= snapH) {
-        //         snapW = resolutions[i][0];
-        //         snapH = resolutions[i][1];
-        //         break;
-        //     }
-        // }
+        const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720]];
+        var standardW = 1920;
+        var standardH = 1080;
+        for (let i = 0; i < resolutions.length; i++) {
+            if (resolutions[i][0] >= snapW && resolutions[i][1] >= snapH) {
+                standardW = resolutions[i][0];
+                standardH = resolutions[i][1];
+                break;
+            }
+        }
+        console.log('snap', snapW, snapH, 'standard', standardW, standardH);
 
         // Build simplified FFmpeg command
         const cmd = `ffmpeg -i "${filepath}" \
-                        -vf "crop=${cropW}:${cropH}:${cropX}:${cropY},pad=${snapW}:${snapH}:${padLeft}:${padTop}:black" \
+                        -vf "crop=${cropW}:${cropH}:${cropX}:${cropY},pad=${standardW}:${standardH}:${padLeft}:${padTop}:black" \
                         -c:v libx264 -profile:v baseline -level 3.0 -preset slow -crf 18 -x264-params bframes=0 -movflags +faststart -pix_fmt yuv420p -c:a aac -b:a 128k -ar 44100 \
                         "${submedia}"`;
 

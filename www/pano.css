@@ -276,9 +276,7 @@ ul .btn-playlist {
 
 /* fill viewport */
 .player.maxiplayer {
-    width: 100vw;
-    height: 100vh;
-    object-fit: contain;
+    
 }
 
 .miniplayer {
