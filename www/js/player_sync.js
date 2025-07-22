@@ -61,7 +61,7 @@ class SyncPlayer extends VideoPlayer {
       
       if (mediaplay != '')
         for (let submedia of data.mediainfo.submedias) {
-          if (submedia.split('.').slice(0, -1).join('.') == this.uuid) {
+          if (submedia.split('-').slice(0, -1).join('-') == this.uuid) {
             mediaplay = data.mediainfo.subfolder + '/' + submedia
             playingsubmedia = true
             break

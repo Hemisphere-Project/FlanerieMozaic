@@ -160,7 +160,6 @@ class VideoPlayer extends EventEmitter {
 
     load(media) {
         if (media == this.media) return
-        console.log('load', media)
         this.media = media
 
         if (this.media == '#camera') 
@@ -190,6 +189,8 @@ class VideoPlayer extends EventEmitter {
             this.video[0].load()
             this.video[0].pause()
         }
+        console.log('load', media, 'src:', this.video.attr('src'))
+
     }
 
     play(media) {

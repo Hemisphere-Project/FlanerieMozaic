@@ -80,7 +80,7 @@ MEDIA.loadroom = (room) => {
             continue
         }
 
-        // media eixsts but the 'filename' subfolder does not exist
+        // media exists but the 'filename' subfolder does not exist
         // -> create it
         if (!fs.existsSync(subfolder)) fs.mkdirSync(subfolder);
 
@@ -186,12 +186,17 @@ MEDIA.devicechanged = function (uuid, room) {
     let didchange = false;
     for (let m in MEDIA.conf[room].medias) {
         const media = MEDIA.conf[room].medias[m];
-        const submedia = path.join(VIDEO_PATH, media.subfolder, uuid + '.mp4');
-        if (fs.existsSync(submedia)) {
-            fs.unlinkSync(submedia);
-            didchange = true;
+        if (media.submedias && media.submedias.length > 0) {
+            const submedias = media.submedias.filter((s) => { return s.startsWith(uuid + '-'); });
+            for (let submedia of submedias) {
+                const submediaPath = path.join(VIDEO_PATH, media.subfolder, submedia);
+                if (fs.existsSync(submediaPath)) {
+                    fs.unlinkSync(submediaPath);
+                    didchange = true;
+                }
+            }
         }
-        media.submedias = media.submedias.filter((s) => { return s !== uuid + '.mp4'; });
+        media.submedias = media.submedias.filter((s) => { return !s.startsWith(uuid + '-'); });
     }
     MEDIA.save();
     return didchange
@@ -216,11 +221,15 @@ MEDIA.unsnap = function (device, media) {
     if (!device || !device.uuid) return
 
     const subfolder = path.join(VIDEO_PATH, media.subfolder);
-    const submedia = path.join(subfolder, device.uuid + '.mp4');
 
-    // Delete the submedia if it exists
-    if (fs.existsSync(submedia)) fs.unlinkSync(submedia);
-    media.submedias = media.submedias.filter((s) => { return s !== device.uuid + '.mp4'; });
+    // Delete submedia starting with device uuid
+    const submedias = media.submedias.filter((s) => { return s.startsWith(device.uuid + '-'); });
+    for (let submedia of submedias) {
+        const submediaPath = path.join(subfolder, submedia);
+        if (fs.existsSync(submediaPath)) fs.unlinkSync(submediaPath);
+    }
+    media.submedias = media.submedias.filter((s) => { return !s.startsWith(device.uuid + '-'); });
+
     MEDIA.save();
 }
 
@@ -234,13 +243,20 @@ MEDIA.snap = function(device, media) {
     return new Promise((resolve, reject) => {
         if (!media || !media.filepath) return reject('Media not found');
         if (!device || !device.uuid) return reject('Device not found');
+        
+        // second timestamp to force cache busting
+        const timestamp = new Date().getTime();
 
         const subfolder = path.join(VIDEO_PATH, media.subfolder);
-        const submedia = path.join(subfolder, device.uuid + '.mp4');
+        const submedia = path.join(subfolder, device.uuid + '-' + timestamp + '.mp4');
         const filepath = path.join(VIDEO_PATH, media.filepath);
 
-        // Delete the submedia if it exists
-        if (fs.existsSync(submedia)) fs.unlinkSync(submedia);
+        // Delete submedia with the same uuid but different timestamp
+        const submedias = media.submedias.filter((s) => { return s.startsWith(device.uuid + '-'); });
+        for (let submedia of submedias) {
+            const submediaPath = path.join(subfolder, submedia);
+            if (fs.existsSync(submediaPath)) fs.unlinkSync(submediaPath);
+        }
 
         // Create the submedia using ffmpeg
 

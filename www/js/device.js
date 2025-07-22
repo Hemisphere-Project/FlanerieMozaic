@@ -168,7 +168,13 @@ class DevicePool {
         // if (!data) return
         data = data.map((v) => { return v.split('.').slice(0, -1).join('.') })
         for (let uuid in this.devices) {
-            let has = data.includes(this.devices[uuid].uuid)
+            let has = false
+            for (let submedia of data) {
+                if (submedia.startsWith(this.devices[uuid].uuid + '-')) {
+                    has = true
+                    break
+                }
+            }
             this.devices[uuid].submedia_available(has)
         }
     }
