@@ -73,10 +73,14 @@ socket.on('state', (data) => {
     if (data.ctrls) {
         $('#controls').show()
         $('.player').addClass('draggable')
+        $('.backstage').addClass('draggable')
+        $('.stage').addClass('draggable')
     }
     else {
         $('#controls').hide()
         $('.player').removeClass('draggable')
+        $('.backstage').removeClass('draggable')
+        $('.stage').removeClass('draggable')
     }
 
     // update media name
