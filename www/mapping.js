@@ -78,19 +78,11 @@ socket.on('medialist', (data) => {
         if (v.file.startsWith('_')) return
         $(`<button class="btn btn-fullwidth">${v.file}</button><br />`).appendTo('#medialist')
             .on('click', () => {
-                console.log('<-playlist', v.filepath)
-                player.playlist.load([v.filepath])
+                console.log('<-play', v.filepath)
+                socket.emit('play', v.filepath)
             })
     })
     
-    // Create button for playlist
-    let playlist = data.filter(v => !v.file.startsWith('_')).map(v => v.filepath)
-    $(`<button class="btn btn-fullwidth btn-playlist">playlist</button><br />`).appendTo('#medialist')
-    .on('click', () => {
-        console.log('<-playlist', playlist)
-        player.playlist.load(playlist)
-    })
-
     // Stop button
     $(`<button class="btn btn-fullwidth btn-stop">stop</button><br />`).appendTo('#medialist')
         .on('click', () => {
@@ -102,8 +94,8 @@ socket.on('medialist', (data) => {
         if (!v.file.startsWith('_')) return
         $(`<button class="btn btn-fullwidth btn-mire">${v.file}</button><br />`).appendTo('#medialist')
             .on('click', () => {
-                console.log('<-playlist', v.filepath)
-                player.playlist.load([v.filepath])
+                console.log('<-play', v.filepath)
+                socket.emit('play', v.filepath)
             })
     })
 })

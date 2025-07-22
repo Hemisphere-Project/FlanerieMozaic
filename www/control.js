@@ -5,6 +5,19 @@ const socket = io()
 var ROOMS = []
 var UUID = '_control-'+Math.random().toString(36).substring(2, 15)
 
+// Notification function
+function showNotification(message, duration = 3000) {
+    const notification = $('#status_notification')
+    notification.text(message)
+    notification.css('opacity', '1')
+    notification.show()
+    
+    setTimeout(() => {
+        notification.css('opacity', '0')
+        setTimeout(() => notification.hide(), 300)
+    }, duration)
+}
+
 socket.on('connect', () => {
     socket.emit('rooms?')
 })
@@ -52,22 +65,14 @@ socket.on('rooms', (data) => {
             let li = $('<li>').appendTo(ul)
             let b = $('<button>').text(v).addClass('btn btn-fullwidth')
                 .appendTo(li).click(() => {
-                    console.log('<-playlist', ROOMS[k].socket.room+'/'+v)
-                    ROOMS[k].player.playlist.load([ROOMS[k].socket.room+'/'+v], LOOP_ALL)
+                    console.log('<-play', ROOMS[k].socket.room+'/'+v)
+                    ROOMS[k].socket.emit('play', ROOMS[k].socket.room+'/'+v)
                 })
         }
 
-        // Playlist button
+        // Stop button
         ROOMS[k].videolist = Object.keys(room.videos).filter(v => !v.startsWith('_')).map(v => ROOMS[k].socket.room+'/'+v)
         let li = $('<li>').appendTo(ul)
-        $('<button>').text('playlist').addClass('btn btn-fullwidth btn-playlist')
-            .appendTo(li).click(() => {
-                console.log('<-playlist', ROOMS[k].videolist)
-                ROOMS[k].player.playlist.load(ROOMS[k].videolist, LOOP_ALL)
-            })
-
-        // Stop button
-        li = $('<li>').appendTo(ul)
         $('<button>').text('stop').addClass('btn btn-fullwidth btn-stop')
             .appendTo(li).click(() => {
                 console.log('<-stop')
@@ -80,17 +85,17 @@ socket.on('rooms', (data) => {
             let li = $('<li>').appendTo(ul)
             let b = $('<button>').text(v).addClass('btn btn-fullwidth btn-mire')
                 .appendTo(li).click(() => {
-                    console.log('<-playlist', ROOMS[k].socket.room+'/'+v)
-                    ROOMS[k].player.playlist.load([ROOMS[k].socket.room+'/'+v], LOOP_ALL)
+                    console.log('<-play', ROOMS[k].socket.room+'/'+v)
+                    ROOMS[k].socket.emit('play', ROOMS[k].socket.room+'/'+v)
                 })
         }
 
-        // On Playlist end reload all playlists (if play synced)
-        ROOMS[k].player.playlist.on('end', () => {
-            if (ROOMS[k].player.playlist.loop != LOOP_NONE) return
-            let synced_rooms = ROOMS.filter(r => r.player.playlist.loop == LOOP_NONE)
-            for (let r of synced_rooms) r.player.playlist.reload() 
-            socket.emit('playsync', ROOMS.filter(r => r.player.playlist.loop != LOOP_NONE).map(r => r.room))
+        // On media end, restart the same media (loop)
+        ROOMS[k].player.on('end', () => {
+            // Auto-restart current media for continuous loop
+            if (ROOMS[k].player.media) {
+                ROOMS[k].socket.emit('play', ROOMS[k].player.media)
+            }
         })
 
         let rctrl = $('<div class="roomctrl">').appendTo(rdiv)
@@ -112,21 +117,41 @@ socket.on('rooms', (data) => {
 
 
 // CONTROLS
-$('#playsync').click(() => {
-    for(let k in ROOMS) {   
-        ROOMS[k].player.playlist.loop = LOOP_NONE
-        ROOMS[k].player.playlist.reload()
-    }
-    socket.emit('playsync')
+$('#play1').click(() => {
+    console.log('Play 1 - Starting first media in all rooms')
+    $('#play1').text('Playing 1...')
+    socket.emit('playindex', 0)
+    showNotification('Starting first media in all rooms')
+    setTimeout(() => $('#play1').text('Play 1'), 1000)
+})
+
+$('#play2').click(() => {
+    console.log('Play 2 - Starting second media in all rooms')
+    $('#play2').text('Playing 2...')
+    socket.emit('playindex', 1)
+    showNotification('Starting second media in all rooms')
+    setTimeout(() => $('#play2').text('Play 2'), 1000)
+})
+
+$('#play3').click(() => {
+    console.log('Play 3 - Starting third media in all rooms')
+    $('#play3').text('Playing 3...')
+    socket.emit('playindex', 2)
+    showNotification('Starting third media in all rooms')
+    setTimeout(() => $('#play3').text('Play 3'), 1000)
+})
+
+$('#resyncall').click(() => {
+    console.log('Resync All - Resetting start offset for all rooms')
+    $('#resyncall').text('Resyncing...')
+    socket.emit('resyncall')
+    showNotification('Resyncing all rooms to current time')
+    setTimeout(() => $('#resyncall').text('Resync All'), 1000)
 })
 
 $('#stopsync').click(() => {
     socket.emit('stopsync')
-})
-
-$('#listsync').click(() => {
-    for(let k in ROOMS) ROOMS[k].player.playlist.load(ROOMS[k].videolist, LOOP_ALL)
-    socket.emit('playsync')
+    showNotification('Stopping all media playback')
 })
 
 $('#newroom').click(() => {

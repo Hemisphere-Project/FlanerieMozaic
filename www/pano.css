@@ -410,7 +410,7 @@ ul .btn-playlist {
 .room ul {
     list-style-type: none;
     padding: 0;
-    height: 50vh;
+    height: 30vh;
     overflow-y: auto;
 }
 
@@ -434,3 +434,138 @@ ul .btn-playlist {
     text-align: center;
     padding: 100px;
 }
+
+/* Control page styles */
+#topcontrols {
+    background-color: #333;
+    padding: 5px;
+}
+
+#topcontrols h3 {
+    color: #fff;
+    text-align: center;
+    float: left;
+}
+
+.sync-controls, .main-controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 10px;
+}/*
+
+.btn {
+    padding: 10px 20px;
+    border: 2px solid #fff;
+    background-color: transparent;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    background-color: #fff;
+    color: #333;
+}
+
+.btn-play {
+    border-color: #4CAF50;
+    color: #4CAF50;
+}
+
+.btn-play:hover {
+    background-color: #4CAF50;
+    color: #fff;
+}
+
+.btn-resync {
+    border-color: #2196F3;
+    color: #2196F3;
+}
+
+.btn-resync:hover {
+    background-color: #2196F3;
+    color: #fff;
+}
+
+.btn-stop {
+    border-color: #f44336;
+    color: #f44336;
+}
+
+.btn-stop:hover {
+    background-color: #f44336;
+    color: #fff;
+}
+
+.btn-fullwidth {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.btn-mire {
+    border-color: #FF9800;
+    color: #FF9800;
+}
+
+.btn-mire:hover {
+    background-color: #FF9800;
+    color: #fff;
+}
+
+.btn-delete {
+    border-color: #f44336;
+    color: #f44336;
+    font-size: 12px;
+    padding: 5px 10px;
+}
+
+.btn-delete:hover {
+    background-color: #f44336;
+    color: #fff;
+}
+
+.btn-infostate {
+    border-color: #9C27B0;
+    color: #9C27B0;
+    font-size: 12px;
+    padding: 5px 10px;
+}
+
+.btn-infostate:hover {
+    background-color: #9C27B0;
+    color: #fff;
+}
+
+@media (max-width: 768px) {
+    .sync-controls, .main-controls {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .btn {
+        padding: 15px 20px;
+        font-size: 18px;
+    }
+    
+    #topcontrols {
+        padding: 15px;
+    }
+}
+    */
+
+#status_notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    z-index: 1000;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+} 

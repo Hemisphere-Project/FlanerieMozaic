@@ -16,7 +16,6 @@
     <script src="/static/js/wakelock.js"></script>
     <script src="/static/js/fullscreen.js"></script>
     <script src="/static/js/eventemitter.js"></script>
-    <script src="/static/js/playlist.js"></script>
     <script src="/static/js/player.js"></script>
     <script src="/static/js/player_sync.js"></script>
     <script src="/static/js/device.js"></script>
@@ -28,14 +27,21 @@
   <body>
 
     <div id="mediaload_overlay">Reloading media...</div>
+    
+    <div id="status_notification" style="display: none;"></div>
 
     <div id="topcontrols">
         <h3>FLANERIE Control</h3>
-        <button id="playsync" class="btn">Sync ALL</button>
-        <button id="stopsync" class="btn btn-stop">Stop ALL</button>
-        <button id="listsync" class="btn btn-playlist">Playlist ALL</button>
-        <button id="newroom" class="btn">New Room</button>
-        <button id="mediaload" class="btn">Reload Media</button>
+        <div class="sync-controls">
+            <button id="play1" class="btn btn-play">Play 1</button>
+            <button id="play2" class="btn btn-play">Play 2</button>
+            <button id="play3" class="btn btn-play">Play 3</button>
+            <button id="resyncall" class="btn btn-resync">Resync All</button>
+            -
+            <button id="stopsync" class="btn btn-stop">Stop ALL</button>
+            <button id="newroom" class="btn">New Room</button>
+            <button id="mediaload" class="btn">Reload Media</button>
+        </div>
     </div>
 
     <div id="rooms"></div>

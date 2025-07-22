@@ -11,9 +11,9 @@ window.onerror = function (message, file, line, column, errorObj) {
     }
     else {
         msg += message
-        msg += " at " + file + ":" + line
+        msg += " at " + file + ":" + line + ":" + column
     }
-    alert(msg)
+    if (line > 0) alert(msg)
 }
 
 // URL PARAMS
@@ -44,6 +44,10 @@ document.title = room + ' :: ' + UUID
 
 // PLAYER
 var player = new SyncPlayer( socket, 'body' )
+
+socket.on('connect', () => {
+    $('#logs').text('🔄 Connecting to sync server...');
+});
 
 socket.on('hello', () => {
     console.log('========= connected ===========')
@@ -182,7 +186,7 @@ $('#snap').click(() => {
 // WELCOME BUTTON
 //
 
-$('#go').click(() => {
+$('#welcome').click(() => {
     $('#welcome').hide()
     wakeLock()
     fullscreen() 

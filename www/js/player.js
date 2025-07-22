@@ -21,8 +21,17 @@ class VideoPlayer extends EventEmitter {
         
         
         // the video element
-        this.video = $('<video class="player draggable" preload="auto" playsinline></video>')
+        this.video = $('<video class="player draggable" preload="auto" loop playsinline></video>')
         this.video.attr('uuid', uuid)
+
+        // Add ended event listener for continuous looping
+        this.video.on('ended', () => {
+            if (this.media && this.playing) {
+                console.log('Video ended, restarting for continuous loop')
+                this.video[0].currentTime = 0
+                this.video[0].play()
+            }
+        })
 
         
         // Full backstage/stage/origin layered player

@@ -50,7 +50,17 @@ const MEDIA = MediaManager(MEDIA_FILE, VIDEO_PATH);
 
 var app = express();
 var server = HttpServer(app);
-var io = new IoServer(server);
+var io = new IoServer(server, {
+  // Ultra-aggressive settings for local WiFi sync
+  maxHttpBufferSize: 2e6,   // Larger buffer for HD content
+  pingTimeout: 15000,       // Very fast timeout detection
+  pingInterval: 5000,       // Ultra-frequent pings for precision
+  // transports: ['websocket'], // Websocket only for lowest latency
+  upgradeTimeout: 2000,     // Near-instant upgrade
+  compression: false,       // Disable compression for lower latency
+  allowEIO3: false,         // Force latest protocol
+  perMessageDeflate: false  // Disable deflate for real-time performance
+});
 
 
 // DEFAULTS 
@@ -133,7 +143,30 @@ function bootstrapDevice(uuid, room, reso) {
   return dev
 }
 
-// Send room state to all clients
+// Debounced update functions to batch multiple rapid updates
+const updateTimeouts = new Map();
+
+function debouncedInfoState(roomid, delay = 50) {
+  if (updateTimeouts.has(`state-${roomid}`)) {
+    clearTimeout(updateTimeouts.get(`state-${roomid}`));
+  }
+  
+  updateTimeouts.set(`state-${roomid}`, setTimeout(() => {
+    infoState(roomid);
+    updateTimeouts.delete(`state-${roomid}`);
+  }, delay));
+}
+
+function debouncedInfoDevices(roomid, delay = 50) {
+  if (updateTimeouts.has(`devices-${roomid}`)) {
+    clearTimeout(updateTimeouts.get(`devices-${roomid}`));
+  }
+  
+  updateTimeouts.set(`devices-${roomid}`, setTimeout(() => {
+    infoDevices(roomid);
+    updateTimeouts.delete(`devices-${roomid}`);
+  }, delay));
+}
 function infoState(roomid, targetid) {
   roomid = roomid || 'default';
   targetid = targetid || roomid;
@@ -181,18 +214,30 @@ function checkSocket(socket) {
 
 
 
+// Connection tracking for performance monitoring
+let connectionCount = 0;
+let connectionBurst = false;
+
 // Socket.io Server
 //
 io.on('connection', (socket) => 
 {
-  socket.on('disconnect', () => {
-
-    // if socket.uuid is master of a room, stop that room
-    if (socket.uuid && socket.uuid === roomstate(socket.room).master) {
-      roomstate(socket.room).media = '';
-      infoState(socket.room);
+  connectionCount++;
+  
+  // Detect connection burst (more than 10 connections in 30 seconds)
+  if (connectionCount > 10) {
+    if (!connectionBurst) {
+      console.log(`⚠️  Connection burst detected: ${connectionCount} connections`);
+      connectionBurst = true;
     }
-
+  }
+  
+  // Reset counter every 30 seconds
+  setTimeout(() => {
+    connectionCount = Math.max(0, connectionCount - 1);
+    if (connectionCount <= 5) connectionBurst = false;
+  }, 30000);
+  socket.on('disconnect', () => {
     if (!socket.uuid || socket.uuid.startsWith('_')) return; // ignore controler / mapper
 
     if (!checkSocket(socket)) return;
@@ -247,8 +292,9 @@ io.on('connection', (socket) =>
       }
     }
 
-    infoDevices(roomid);
-    infoState(roomid, uuid);
+    // Use debounced updates during connection bursts
+    debouncedInfoDevices(roomid, 100);
+    setTimeout(() => infoState(roomid, uuid), 100);
     infoMedialist(roomid, uuid);
   })
 
@@ -422,7 +468,6 @@ io.on('connection', (socket) =>
     if (media !== undefined) state.media = media;
     else state.media = state.lastmedia;
     state.paused = false;
-    state.master = socket.uuid
     infoState(socket.room);
     // console.log('play', media, roomstate(socket));
   })
@@ -578,13 +623,71 @@ io.on('connection', (socket) =>
     io.emit('stop');
   })
 
-  // SYNC Server - client init
-  syncServer.start( 
-    (...args) => { socket.emit('pong', ...args) },  // send  
-    (callback) => { socket.on('ping', (...args) => { callback(...args) }) },  // receive
-  );
+  // Play indexed media across all rooms with shared sync
+  socket.on('playindex', (index) => {
+    let offsetTime = getTimeFunction();
+    console.log('playindex command received for index:', index);
+    
+    for (let roomid in STORE.rooms) {
+      try {
+        // Get media list for this room (excluding those starting with _)
+        let mediaList = Object.keys(MEDIA.medialist(roomid)).filter(v => !v.startsWith('_'));
+        console.log('Room', roomid, 'media list:', mediaList);
+        
+        if (index < mediaList.length && index >= 0) {
+          // Play the media at the specified index
+          let media = roomid + '/' + mediaList[index];
+          roomstate(roomid).media = media;
+          roomstate(roomid).offsetTime = offsetTime;
+          roomstate(roomid).paused = false;
+          console.log('playindex', index, roomid, media, 'at time', offsetTime);
+        } else {
+          // No media at this index, stop playback
+          roomstate(roomid).media = null;
+          console.log('playindex', index, roomid, 'no media at index - stopping');
+        }
+        infoState(roomid);
+      } catch (error) {
+        console.error('Error in playindex for room', roomid, ':', error);
+      }
+    }
+  })
+
+  // Resync all rooms
+  socket.on('resyncall', () => {
+    let offsetTime = getTimeFunction();
+    console.log('resyncall command received, new sync time:', offsetTime);
+    
+    let syncedRooms = 0;
+    for (let roomid in STORE.rooms) {
+      try {
+        if (roomstate(roomid).media) {
+          roomstate(roomid).offsetTime = offsetTime;
+          roomstate(roomid).paused = false;
+          console.log('resyncall - room', roomid, 'media:', roomstate(roomid).media, 'synced to time:', offsetTime);
+          infoState(roomid);
+          syncedRooms++;
+        } else {
+          console.log('resyncall - room', roomid, 'has no active media, skipping');
+        }
+      } catch (error) {
+        console.error('Error in resyncall for room', roomid, ':', error);
+      }
+    }
+    console.log('resyncall completed for', syncedRooms, 'rooms');
+  })
+
+  // SYNC Server - ultra-aggressive for local WiFi perfect sync
+  const syncInitDelay = Math.random() * 500; // Reduced to 0.5s for fastest sync startup
   
-  // Send initial HELLO trigger
+  setTimeout(() => {
+    syncServer.start( 
+      (...args) => { socket.emit('pong', ...args) },  // send  
+      (callback) => { socket.on('ping', (...args) => { callback(...args) }) },  // receive
+    );
+  }, syncInitDelay);
+  
+  // Send initial HELLO trigger immediately
   socket.emit('hello');
 
 });
