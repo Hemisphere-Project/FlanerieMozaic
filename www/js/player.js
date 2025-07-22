@@ -21,7 +21,7 @@ class VideoPlayer extends EventEmitter {
         
         
         // the video element
-        this.video = $('<video class="player draggable" playsinline></video>')
+        this.video = $('<video class="player draggable" preload="auto" playsinline></video>')
         this.video.attr('uuid', uuid)
 
         

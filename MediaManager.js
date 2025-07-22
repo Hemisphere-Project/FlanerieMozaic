@@ -299,7 +299,7 @@ MEDIA.snap = function(device, media) {
         // Build simplified FFmpeg command
         const cmd = `ffmpeg -i "${filepath}" \
                         -vf "crop=${cropW}:${cropH}:${cropX}:${cropY},pad=${standardW}:${standardH}:${padLeft}:${padTop}:black" \
-                        -c:v libx264 -profile:v baseline -level 3.0 -preset slow -crf 18 -x264-params bframes=0 -movflags +faststart -pix_fmt yuv420p -c:a aac -b:a 128k -ar 44100 \
+                        -c:v libx264 -profile:v baseline -level 3.0 -preset slow -crf 20 -maxrate 1M -bufsize 2M -x264-params bframes=0 -movflags +faststart -pix_fmt yuv420p -c:a aac -b:a 128k -ar 44100 \
                         "${submedia}"`;
 
         // rescale finale video to 640x480

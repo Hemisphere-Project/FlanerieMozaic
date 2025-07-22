@@ -54,11 +54,11 @@ NOVEMBRE / DECEMBRE
 ***********
 ERASME
 ***********
-- Check UUID/ Cookie ? fingerprintjs ?
+X Check UUID/ Cookie ? fingerprintjs ?
 - Regie : z-index device
 - Regie : select & keep device 
-- Regie : move au clavier
-- Zoom / device (dpi)
+X Regie : move au clavier
+X Zoom / device (dpi)
 - Timeoffset / device ? (optional)
 - Pi4 player 
 
@@ -70,7 +70,7 @@ POST-ERASME
 	* Move / Zoom selected player
 - Pi 90° / FullHD -> lags
 
-- FFMPEG export vignette !
+X FFMPEG export vignette !
 - Upload video => file manager
 - Apk kiosk
 - Regie split => Files / Mapping / Playback
@@ -78,23 +78,22 @@ POST-ERASME
 *****************
 POST-KXKM-OKTOBER
 *****************
-- ** Upload HD -> Create SD version -> Create fragments
-- ** Stage: Offset position and zoom per video (instead of global), layout still global
+X ** Upload HD -> Create SD version -> Create fragments
+X ** Stage: Offset position and zoom per video (instead of global), layout still global
 - * Pre-Loading time: length ? Cache ? Storage PWA ... ?
 - * Playlist: Créer une liste, boucle ou pas, load per video settings (offset / zoom)
 x * Sync room (on every start: reset all time offset, on play Playlist, triggers playlist on all)
-- ** control : device not movable // controllable if not selected (on regie AND on client device)
-- 
+X ** control : device not movable // controllable if not selected (on regie AND on client device) 
 - Backup / Restore JSON
 - Standard movie weight: 2Mo/s 240Mo 1500px width  
-
 
 **************
 FRAPPAZ
 **************
 
-- CONTROL: room delete : BROKEN....
-- on new room -> create media folder
-- CONTROL: Button Media list Reload
 - CONTROL: Button Server Restart 
 - CONTROL: snap status (check if snap are ok for all devices)
+- SOCKETIO / TIMESYNC : prevent hang on startup rush
+- FILES : streamline Nginx media distribution
+- CONTROL: re-send play to room (keep current sync offset)
+
