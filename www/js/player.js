@@ -204,14 +204,32 @@ class VideoPlayer extends EventEmitter {
 
     play(media) {
         if (media && media != this.media) this.load(media)
-        else if (this.media == '') return
+        else if (this.media == '') return Promise.resolve()
         console.log('play!')
         // $('#logs').text('play! '+ media)
         this.video[0].currentTime = 0
         this.video[0].style.visibility = 'visible'
-        this.video[0].play()
-        this.playing = true
-        this.paused = false
+        
+        // Return the promise from play() to handle interruptions
+        const playPromise = this.video[0].play()
+        if (playPromise !== undefined) {
+          return playPromise.then(() => {
+            this.playing = true
+            this.paused = false
+          }).catch(error => {
+            // Handle play interruption gracefully
+            if (error.name === 'AbortError') {
+              console.log('Play was interrupted, this is normal during sync adjustments')
+            } else {
+              console.error('Play error:', error)
+            }
+            throw error
+          })
+        } else {
+          this.playing = true
+          this.paused = false
+          return Promise.resolve()
+        }
     }
 
     pause() {

@@ -1,6 +1,8 @@
 feather.replace();
 
-$('#logs').text("hello")
+logp("hello")
+
+
 
 // LOGS
 window.onerror = function (message, file, line, column, errorObj) {
@@ -46,7 +48,7 @@ document.title = room + ' :: ' + UUID
 var player = new SyncPlayer( socket, 'body' )
 
 socket.on('connect', () => {
-    $('#logs').text('🔄 Connecting to sync server...');
+    logp('🔄 Connecting to sync server...');
 });
 
 socket.on('hello', () => {
@@ -86,6 +88,10 @@ socket.on('state', (data) => {
         $('.backstage').removeClass('draggable')
         $('.stage').removeClass('draggable')
     }
+
+    // toggle logs
+    if (data.logs) $('#logs').show()
+    else $('#logs').hide()
 
     // update media name
     $('#mediaplay').text(player.media)
@@ -153,7 +159,7 @@ function updateSize() {
     if (window.innerWidth == 0 && window.innerHeight == 0) return
     $('#resolution').text(window.innerWidth+"x"+window.innerHeight)
     $('#ratio').text("ratio: "+window.devicePixelRatio)
-    $('#logs').append("updateSize "+UUID+" "+room+" "+window.innerWidth+"x"+window.innerHeight+"<br>")
+    logp("updateSize "+UUID+" "+room+" "+window.innerWidth+"x"+window.innerHeight+"<br>")
     console.log('updateSize', UUID, room, {x: window.innerWidth, y: window.innerHeight})
 
     socket.emit('hi', UUID, room, {x: window.innerWidth, y: window.innerHeight})
@@ -180,6 +186,10 @@ $('#fullscreen').click(() => {
 $('#snap').click(() => {
     if (player.state.media == '') return
     socket.emit('snap', UUID, player.state.media)
+})
+
+$('#blog').click(() => {
+    $("#logs").toggle()
 })
 
 

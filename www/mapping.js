@@ -150,6 +150,10 @@ $("#ctrls").click((e) => {
     socket.emit('toggleCtrls')
 })
 
+$("#logShow").click((e) => {
+   socket.emit('toggleLogs')
+})
+
 $('#clear').click(() => {
     if (!confirm('Clear all inactive devices?')) return
     socket.emit('clearDevices')
@@ -258,6 +262,16 @@ $('#snapAll').click(() => {
 // SELECT
 $('#selectAll').click(() => {
     devices.toggleSel()
+})
+
+/// LOGS
+
+$('#blogAll').click(() => {
+    socket.emit('logAll', -1)
+})
+
+$('#muteAll').click(() => {
+    devices.muteAll()   
 })
 
 

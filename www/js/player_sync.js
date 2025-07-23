@@ -1,6 +1,18 @@
 
 // Virtual html5 media player
 
+function logp(...message) {
+    console.log(...message);
+
+    try {
+        $('#logs').append( message.join(' ') + '<br>' );
+        // Scroll to bottom
+        $('#logs').scrollTop($('#logs')[0].scrollHeight);
+    } catch (error) {
+    }
+}
+
+
 class SyncPlayer extends VideoPlayer {
   constructor( socket, container )  // Provide destination media element
   {
@@ -15,7 +27,7 @@ class SyncPlayer extends VideoPlayer {
     
     // syncer
     this._updateTimer = null;
-    this._refreshInterval = 50;  // Compromise: 50ms for better sync accuracy vs 20ms
+    this._refreshInterval = 20;  // Compromise: 50ms for better sync accuracy vs 20ms
     this._correctionTime = 3000;  // Reduce from 5000 for more responsive corrections
     this._seekThreshold = 1000;    // Reduce from 2000 for more accurate seeking
     
@@ -25,6 +37,11 @@ class SyncPlayer extends VideoPlayer {
     this._consecutiveSeeks = 0;
     this._maxConsecutiveSeeks = 3;
     this._adaptiveThreshold = 1000;  // Dynamic threshold that increases with problems
+    
+    // Play/pause state management
+    this._lastPlayPauseTime = 0;
+    this._playPauseCooldown = 500;  // Minimum 500ms between play/pause calls
+    this._pendingPlayPromise = null;
 
     // websocket (socket.io)
     this.socket = socket;
@@ -35,39 +52,45 @@ class SyncPlayer extends VideoPlayer {
       {
         pingSeriesIterations: 8,        // Slightly more for better initial accuracy
         pingSeriesPeriod: 0.25,         // Back to default for faster initial sync
-        pingSeriesDelay: { min: 5, max: 12 }, // Much more frequent initial sync series
-        longTermDataTrainingDuration: 30, // Reduce to 30s for faster "sync" status
-        estimationStability: 250e-6     // Slightly more adaptive for faster convergence
+        pingSeriesDelay: { min: 2, max: 4 }, // Much more frequent initial sync series
+        longTermDataTrainingDuration: 20, // Reduce to 20s for faster "sync" status
+        estimationStability: 500e-6     // Slightly more adaptive for faster convergence
       }
     );
 
     // Connect to Sync server WS
     //
     socket.on('connect', () => {
-      console.log('connected to sync server WS !');
+      logp('connected to sync server WS !');
+      var lastOffset = 0;
 
       // start synchronization process with faster initial sync
       this.syncClient.start(
         (pingId, clientPingTime) => { this.socket.emit('ping', pingId, clientPingTime) },
         (callback) => { this.socket.on('pong', (...args) => { callback(...args) }) },
         (status) => { 
+
           // Allow sync during 'training' phase if offset is reasonable (< 100ms)
           const isTrainingButGood = (status.status === 'training' && 
-                                   Math.abs(status.timeOffset) < 0.1 && 
+                                   lastOffset > 0 &&
+                                   Math.abs(lastOffset - status.timeOffset) < 0.1 && 
                                    status.statusDuration > 5);
-          
+
           this.synced = (status.status === 'sync' || isTrainingButGood);
           
           if (status.status === 'sync') {
-            console.log('✅ Fully synchronized - offset:', Math.round(status.timeOffset * 1000), 'ms');
+            logp('✅ Fully synchronized - offset:', Math.round(status.timeOffset * 1000), 'ms');
           } else if (isTrainingButGood) {
-            console.log('🟡 Training but usable - offset:', Math.round(status.timeOffset * 1000), 'ms');
+            logp('🟡 Training but usable - offset:', Math.round(status.timeOffset * 1000), 'ms');
           }
           
           // Debug info for initial sync optimization
-          if (status.status === 'training' && status.statusDuration < 10) {
-            console.log('⏱️ Initial sync progress:', Math.round(status.statusDuration), 's, offset:', Math.round(status.timeOffset * 1000), 'ms');
+          else {
+            logp('⏱️ Initial sync progress:', Math.round(status.statusDuration), 's, offset:', Math.round(Math.abs(lastOffset - status.timeOffset) * 1000), 'ms');
           }
+
+          lastOffset = status.timeOffset;
+
         }
       );
     })
@@ -145,44 +168,74 @@ class SyncPlayer extends VideoPlayer {
     // Not playing
     if (!this.media) return this.nextupdate()
 
-    // Not synced: pause
+    const currentTime = performance.now();
+    const timeSinceLastPlayPause = currentTime - this._lastPlayPauseTime;
+
+    // Not synced: pause (but avoid interrupting ongoing play requests)
     if (!this.synced) {
-      if (this.playing && !this.paused) this.pause();
+      if (this.playing && !this.paused && !this.element.seeking && 
+          timeSinceLastPlayPause > this._playPauseCooldown) {
+        // Add a small delay to prevent interrupting play() calls
+        if (this.element.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+          this._lastPlayPauseTime = currentTime;
+          // this.pause();
+        }
+      }
       return this.nextupdate()
     }
 
-    // Now synced: play
-    if (this.synced && this.playing && this.paused) {
-      this.play();
+    // Now synced: play (but avoid conflicting with pause calls)
+    if (this.synced && this.playing && this.paused && !this.element.seeking &&
+        timeSinceLastPlayPause > this._playPauseCooldown) {
+      // Ensure the element is ready before trying to play
+      if (this.element.readyState >= 2) { // HAVE_CURRENT_DATA or higher
+        this._lastPlayPauseTime = currentTime;
+        
+        // Cancel any pending play promise
+        if (this._pendingPlayPromise) {
+          this._pendingPlayPromise = null;
+        }
+        
+        this._pendingPlayPromise = this.play().catch(error => {
+          if (error.name !== 'AbortError') {
+            logp('Play error:', error.message);
+          }
+          this._pendingPlayPromise = null;
+        });
+      }
     }
 
     const targetTime = this.getSyncTime();
-    const currentTime = this.element.currentTime;
-    const now = performance.now();
+    const videoCurrentTime = this.element.currentTime;
+    const now = currentTime; // Use the same timestamp for consistency
     
     // Validate all time values to prevent non-finite errors
-    if (!isFinite(targetTime) || targetTime < 0 || !isFinite(currentTime) || !isFinite(this.element.duration) || this.element.duration <= 0) {
-      console.warn('Invalid time values detected:', { targetTime, currentTime, duration: this.element.duration });
+    if (!isFinite(targetTime) || !isFinite(videoCurrentTime) || !isFinite(this.element.duration) || this.element.duration <= 0) {
+      logp('WARN: Invalid time values detected:', JSON.stringify({ targetTime, videoCurrentTime, duration: this.element.duration }));
       return this.nextupdate();
     }
     
-    const normalizedTargetTime = targetTime % this.element.duration;
+    // Handle negative targetTime properly with positive modulo
+    var normalizedTargetTime = (targetTime % this.element.duration) 
+    while (normalizedTargetTime < 0) normalizedTargetTime += this.element.duration;
+    normalizedTargetTime = normalizedTargetTime % this.element.duration; // Ensure it's within bounds
     var inBound = (normalizedTargetTime >= 0) && (normalizedTargetTime <= this.element.duration);
 
     // Out of bound: stop
     if (this.element.duration && !inBound) {
+      logp('WARN: Out of bounds target time:', normalizedTargetTime, 'for duration:', this.element.duration);
       return this.nextupdate()
     }
     
-    const diff = normalizedTargetTime - currentTime;
+    const diff = normalizedTargetTime - videoCurrentTime;
     const absDiff = Math.abs(diff);
     
     // Additional validation for diff values
     if (!isFinite(diff) || !isFinite(absDiff)) {
-      console.warn('Invalid diff calculation:', { diff, absDiff, normalizedTargetTime, currentTime });
+      logp('WARN: Invalid diff calculation:', { diff, absDiff, normalizedTargetTime, videoCurrentTime });
       return this.nextupdate();
     }
-    
+
     // Skip loop detection and prevention
     const timeSinceLastSeek = now - this._lastSeekTime;
     const isInSeekCooldown = timeSinceLastSeek < this._seekCooldown;
@@ -202,16 +255,16 @@ class SyncPlayer extends VideoPlayer {
       if (isFinite(normalizedTargetTime) && normalizedTargetTime >= 0 && normalizedTargetTime <= this.element.duration) {
         this.element.currentTime = normalizedTargetTime;
         this.element.playbackRate = 1.0; // Reset to normal rate after seek
+        logp('Rate reset to 1.0 after seek');
         this._lastSeekTime = now;
         this._consecutiveSeeks++;
-        
-        console.log('Seeking:', Math.round(diff*1000), 'ms diff, consecutive seeks:', this._consecutiveSeeks);
+        logp('Seeking:', Math.round(diff*1000), 'ms diff, consecutive seeks:', this._consecutiveSeeks);
         
         // Longer update interval after seeking to let it settle
         this._updateTimer = window.setTimeout(() => { this.update(); }, this._refreshInterval * 3);
         return;
       } else {
-        console.warn('Invalid seek target time:', normalizedTargetTime);
+        logp('WARN: Invalid seek target time:', normalizedTargetTime);
         return this.nextupdate();
       }
     } 
@@ -219,26 +272,24 @@ class SyncPlayer extends VideoPlayer {
       // Very close - reset adaptive threshold and consecutive seeks
       this._adaptiveThreshold = Math.max(this._seekThreshold, this._adaptiveThreshold * 0.9);
       this._consecutiveSeeks = 0;
-      this.element.playbackRate = 1.0;
+      if (this.element.playbackRate !== 1.0) {
+        this.element.playbackRate = 1.0; // Reset to normal rate
+        logp('Rate reset to 1.0 after close diff');
+      }
     }
     else {
+      
       // Use playback rate adjustment for smaller differences
       const rate = 1.0 + Math.sign(diff) * Math.min(0.3, absDiff * 2); // Gentler rate adjustment
-      
+
       // Validate rate before setting
       if (!isFinite(rate) || rate <= 0) {
-        console.warn('Invalid playback rate calculated:', rate);
+        logp('WARN: Invalid playback rate calculated:', rate);
         this.element.playbackRate = 1.0; // Reset to safe value
-      } else if (rate < 0.95 || rate > 1.25) {
-        // Rate too extreme, but we're in cooldown - just wait
-        if (isInSeekCooldown) {
-          const safeRate = Math.max(0.95, Math.min(1.25, rate));
-          if (isFinite(safeRate)) {
-            this.element.playbackRate = safeRate;
-          }
-        }
-      } else if (this.element.playbackRate !== rate && isFinite(rate)) {
+        logp('Rate reset to 1.0 after invalid rate');
+      } else if (this.element.playbackRate !== rate) {
         this.element.playbackRate = rate;
+        logp('Playback rate adjusted to', rate, 'for diff:', Math.round(diff*1000), 'ms');
         this._consecutiveSeeks = Math.max(0, this._consecutiveSeeks - 1); // Reduce seek count on successful rate adjustment
       }
     }
@@ -256,6 +307,8 @@ class SyncPlayer extends VideoPlayer {
     this._lastSeekTime = 0;
     this._consecutiveSeeks = 0;
     this._adaptiveThreshold = this._seekThreshold;
+    this._lastPlayPauseTime = 0;
+    this._pendingPlayPromise = null;
     console.log('Sync adaptation reset');
   }
 
@@ -269,7 +322,7 @@ class SyncPlayer extends VideoPlayer {
       
       // Validate sync time values
       if (!isFinite(syncTime) || !isFinite(offsetTime)) {
-        console.warn('Invalid sync time values:', { syncTime, offsetTime });
+        logp('WARN: Invalid sync time values:', { syncTime, offsetTime });
         return -1;
       }
       
@@ -277,13 +330,13 @@ class SyncPlayer extends VideoPlayer {
       
       // Ensure we return a valid time
       if (!isFinite(this.currentTime)) {
-        console.warn('Invalid calculated currentTime:', this.currentTime);
+        logp('WARN: Invalid calculated currentTime:', this.currentTime);
         return -1;
       }
       
       return this.currentTime;
     } catch (error) {
-      console.error('Error in getSyncTime:', error);
+      logp('ERROR: Error in getSyncTime:', error);
       return -1;
     }
   }

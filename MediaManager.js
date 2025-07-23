@@ -104,6 +104,11 @@ MEDIA.loadroom = (room) => {
             }
         });
     }
+
+    // re-order medias by name  
+    MEDIA.conf[room].medias = Object.fromEntries(
+        Object.entries(MEDIA.conf[room].medias).sort((a, b) => a[0].localeCompare(b[0]))
+    );
 }
 
 
@@ -278,8 +283,30 @@ MEDIA.snap = function(device, media) {
         const zoom = Dz*Mz;
 
         // Target snap size 
-        const snapW = Math.round(Dw / zoom);
-        const snapH = Math.round(Dh / zoom);
+        let snapW = Math.round(Dw / zoom);
+        let snapH = Math.round(Dh / zoom);
+        
+        // Find the smallest standard resolution that fits the snap [240p, 360p, 480p, 720p]
+        const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720]];
+        var standardW = resolutions[resolutions.length - 1][0];
+        var standardH = resolutions[resolutions.length - 1][1];
+        for (let i = 0; i < resolutions.length; i++) {
+            if (resolutions[i][0] >= snapW && resolutions[i][1] >= snapH) {
+                standardW = resolutions[i][0];
+                standardH = resolutions[i][1];
+                break;
+            }
+        }
+
+        // make snapW and snapH smaller than standardW and standardH while keeping the aspect ratio
+        if (snapW > standardW) {
+            snapH = Math.round(snapH * (standardW / snapW));
+            snapW = standardW;
+        }
+        if (snapH > standardH) {
+            snapW = Math.round(snapW * (standardH / snapH));
+            snapH = standardH;
+        }
 
         // Target snap position
         const snapX = Math.round( (Dx+Mx*Dz) / zoom );
@@ -299,17 +326,10 @@ MEDIA.snap = function(device, media) {
         const cropX = Math.max(0, snapX);
         const cropY = Math.max(0, snapY);
 
-        // Find the smallest standard resolution that fits the snap [240p, 360p, 480p, 720p, 1080p]
-        const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720]];
-        var standardW = 1920;
-        var standardH = 1080;
-        for (let i = 0; i < resolutions.length; i++) {
-            if (resolutions[i][0] >= snapW && resolutions[i][1] >= snapH) {
-                standardW = resolutions[i][0];
-                standardH = resolutions[i][1];
-                break;
-            }
-        }
+        
+
+    
+
         console.log('snap', snapW, snapH, 'standard', standardW, standardH);
 
         // Build simplified FFmpeg command

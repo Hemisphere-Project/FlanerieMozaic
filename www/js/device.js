@@ -20,12 +20,13 @@ class Device {
 
         player.stage.append(this.dom)
 
-        this.dom.on('dragstart', () => { this.select(true) })
+        this.dom.on('dragstart', () => { /*this.select(true)*/ })
         this.dom.on('dragend', () => { this.select(false) })
         this.dom.on('dblclick', () => { this.select(true); return false; })
 
         // Drag
         this.dom.on('drag', (e, delta) => {
+            if (!this.selected) return
             let d = {x: -1*delta.x/player.stagescale, y: -1*delta.y/player.stagescale}
             socket.emit('move', d, this.uuid)
         })
@@ -81,6 +82,12 @@ class Device {
         // submedia
         $('<button class="btnSub">snap</button>').appendTo(controls).on('click', () => {
             socket.emit('snap', this.uuid)
+            return false
+        })
+
+        // reload
+        $('<button class="btnReload">reload</button>').appendTo(controls).on('click', () => {
+            socket.emit('reload', this.uuid)
             return false
         })
         
@@ -145,6 +152,7 @@ class DevicePool {
         this.devices = {}
         this.player = player
         this.room = room || 'default'
+        this.muteState = false
     }
 
     update(data) 
@@ -193,6 +201,15 @@ class DevicePool {
         
         for (let uuid in this.devices)
             this.devices[uuid].select(doSel)
+    }
+
+    muteAll() {
+        this.muteState = !this.muteState
+        for (let uuid in this.devices) {
+            let mute = this.muteState ? 0.0 : 1.0
+            socket.emit('deviceconf', 'volume', mute, uuid)
+            this.devices[uuid].dom.find('.mute').prop('checked', (mute == 0.0))
+        }
     }
 
 }

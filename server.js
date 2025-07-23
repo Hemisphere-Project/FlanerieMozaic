@@ -71,7 +71,8 @@ const defaultState = {
   mediainfo: {},
   paused: false,
   ctrls: false,
-  valid: false
+  valid: false,
+  logs: false, // Show logs in device
 }
 
 const defaultDevice = {
@@ -452,6 +453,14 @@ io.on('connection', (socket) =>
     infoState(socket.room);
   })
 
+  // Toggle logs
+  socket.on('toggleLogs', () => 
+  {
+    if (!checkSocket(socket)) return;
+    roomstate(socket).logs = !roomstate(socket).logs
+    infoState(socket.room);
+  })
+
   // Infostate
   socket.on('infostate', () => 
   {
@@ -490,6 +499,13 @@ io.on('connection', (socket) =>
   socket.on('reloadAll', () => {
     if (!checkSocket(socket)) return;
     io.to(socket.room).emit('reload');
+  })
+
+  // reload
+  socket.on('reload', (uuid) => {
+    if (!checkSocket(socket)) return;
+    if (uuid === undefined) uuid = socket.uuid;
+    io.to(uuid).emit('reload');
   })
 
   // snapAll
