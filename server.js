@@ -219,6 +219,37 @@ function checkSocket(socket) {
 let connectionCount = 0;
 let connectionBurst = false;
 
+// FFmpeg job tracker
+const ffmpegJobs = [];
+
+function broadcastJobStatus() {
+  const status = ffmpegJobs.map(j => ({type: j.type, description: j.description, status: j.status}));
+  io.emit('ffmpeg-status', status);
+}
+
+function trackJob(type, description, promise) {
+  const job = {type, description, status: 'running'};
+  ffmpegJobs.push(job);
+  broadcastJobStatus();
+  return promise.then((result) => {
+    job.status = 'done';
+    broadcastJobStatus();
+    setTimeout(() => {
+      ffmpegJobs.splice(ffmpegJobs.indexOf(job), 1);
+      broadcastJobStatus();
+    }, 3000);
+    return result;
+  }).catch((err) => {
+    job.status = 'error';
+    broadcastJobStatus();
+    setTimeout(() => {
+      ffmpegJobs.splice(ffmpegJobs.indexOf(job), 1);
+      broadcastJobStatus();
+    }, 5000);
+    throw err;
+  });
+}
+
 // Socket.io Server
 //
 io.on('connection', (socket) => 
@@ -359,7 +390,7 @@ io.on('connection', (socket) =>
     infoState(socket.room, uuid);
     var now = Date.now();
 
-    MEDIA.snap(dev, media)
+    trackJob('snap', `${uuid}`, MEDIA.snap(dev, media))
       .then(() => {
         // wait at least 2s since now
         setTimeout(() => {
@@ -523,7 +554,7 @@ io.on('connection', (socket) =>
     async function snapAll() {
       for (let uuid in room(socket).devices) {
         let dev = device(uuid, socket);
-        await MEDIA.snap(dev, media).then(() => {
+        await trackJob('snap', `${uuid}`, MEDIA.snap(dev, media)).then(() => {
           // wait at least 2s since now
           setTimeout(() => {
             infoMedialist(socket.room);
@@ -575,6 +606,38 @@ io.on('connection', (socket) =>
   socket.on('devices?', () => {
     if (!checkSocket(socket)) return;
     infoDevices(socket.room, socket.uuid);
+  })
+
+  //
+  // THUMBVIDEO
+  //
+
+  // Check thumbvideo status for a given media index across all rooms
+  socket.on('thumbvideo-status?', (index, callback) => {
+    let result = {};
+    for (let roomid in STORE.rooms) {
+      let mediaList = Object.keys(MEDIA.medialist(roomid)).filter(v => !v.startsWith('_'));
+      if (index >= 0 && index < mediaList.length) {
+        let mediapath = roomid + '/' + mediaList[index];
+        result[roomid] = MEDIA.hasThumbvideo(mediapath);
+      }
+    }
+    if (typeof callback === 'function') callback(result);
+  })
+
+  // Generate thumbvideos for a list of {room, media} entries
+  socket.on('generateThumbvideos', async (entries) => {
+    if (!entries || !Array.isArray(entries)) return;
+    for (let entry of entries) {
+      try {
+        await trackJob('thumbvideo', `${entry.room}/${entry.media}`,
+          MEDIA.generateThumbvideo(entry.room + '/' + entry.media));
+        // Re-broadcast state so control players switch to the new thumbvideo
+        infoState(entry.room);
+      } catch(err) {
+        console.error('Thumbvideo generation error:', err);
+      }
+    }
   })
 
   //

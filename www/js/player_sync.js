@@ -109,6 +109,23 @@ class SyncPlayer extends VideoPlayer {
       // Media
       let mediaplay = data.media || ''
       let playingsubmedia = false
+
+      // Control page players: prefer low-res thumbvideo when available
+      let usingThumb = false
+      if (this.uuid.startsWith('_control') && mediaplay !== '' && data.mediainfo && data.mediainfo.thumbvideo) {
+        mediaplay = data.mediainfo.thumbvideo
+        usingThumb = true
+      }
+      
+      // Update resolution tag on control miniplayers
+      if (this.uuid.startsWith('_control')) {
+        let tag = this.container.find('.res-tag')
+        if (tag.length === 0) tag = $('<span class="res-tag"></span>').prependTo(this.container)
+        if (mediaplay === '') tag.hide()
+        else {
+          tag.text(usingThumb ? 'THUMB' : 'FULL').removeClass('res-full res-thumb').addClass(usingThumb ? 'res-thumb' : 'res-full').show()
+        }
+      }
       
       if (mediaplay != '')
         for (let submedia of data.mediainfo.submedias) {

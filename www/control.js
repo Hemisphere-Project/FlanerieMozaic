@@ -5,6 +5,18 @@ const socket = io()
 var ROOMS = []
 var UUID = '_control-'+Math.random().toString(36).substring(2, 15)
 
+// Check HTTPS cert acceptance for HTTP/2 video serving
+;(function checkH2Cert() {
+    const host = window.location.hostname
+    if (host !== '10.0.0.1' && host !== '10.0.0.2') return
+    const testUrl = 'https://' + host + ':8443/'
+    fetch(testUrl, {mode: 'no-cors'}).catch(() => {
+        // Show a clickable banner (user click = allowed popup)
+        const banner = $('<div id="cert_banner">⚠ Video previews require accepting the HTTPS certificate. <a href="' + testUrl + '" target="_blank">Click here to accept it</a>, then reload this page.</div>')
+        $('body').prepend(banner)
+    })
+})()
+
 // Notification function
 function showNotification(message, duration = 3000) {
     const notification = $('#status_notification')
@@ -16,6 +28,42 @@ function showNotification(message, duration = 3000) {
         notification.css('opacity', '0')
         setTimeout(() => notification.hide(), 300)
     }, duration)
+}
+
+// FFmpeg toast
+socket.on('ffmpeg-status', (jobs) => {
+    const toast = $('#ffmpeg_toast')
+    toast.empty()
+    for (let j of jobs) {
+        let cls = 'job' + (j.status === 'done' ? ' done' : j.status === 'error' ? ' error' : '')
+        $('<div>').addClass(cls).text(`${j.type} ${j.description} — ${j.status}`).appendTo(toast)
+    }
+})
+
+// Thumbvideo-aware play helper
+function playIndex(index) {
+    socket.emit('thumbvideo-status?', index, (statusMap) => {
+        let missing = Object.keys(statusMap).filter(r => !statusMap[r])
+        if (missing.length === 0) {
+            socket.emit('playindex', index)
+            return
+        }
+        if (confirm(`Thumbvideos missing for: ${missing.join(', ')}.\nGenerate them now?`)) {
+            // Build entries list from rooms data
+            let entries = []
+            for (let k in ROOMS) {
+                let room = ROOMS[k]
+                let videos = Object.keys(room.videos).filter(v => !v.startsWith('_'))
+                if (index < videos.length && !statusMap[room.room]) {
+                    entries.push({ room: room.room, media: videos[index] })
+                }
+            }
+            socket.emit('generateThumbvideos', entries)
+            showNotification('Thumbvideo generation started — play will use thumbvideos once ready')
+        }
+        // Play full-res anyway
+        socket.emit('playindex', index)
+    })
 }
 
 socket.on('connect', () => {
@@ -122,7 +170,7 @@ socket.on('rooms', (data) => {
 $('#play1').click(() => {
     console.log('Play 1 - Starting first media in all rooms')
     $('#play1').text('Playing 1...')
-    socket.emit('playindex', 0)
+    playIndex(0)
     showNotification('Starting first media in all rooms')
     setTimeout(() => $('#play1').text('Play 1'), 1000)
 })
@@ -130,7 +178,7 @@ $('#play1').click(() => {
 $('#play2').click(() => {
     console.log('Play 2 - Starting second media in all rooms')
     $('#play2').text('Playing 2...')
-    socket.emit('playindex', 1)
+    playIndex(1)
     showNotification('Starting second media in all rooms')
     setTimeout(() => $('#play2').text('Play 2'), 1000)
 })
@@ -138,7 +186,7 @@ $('#play2').click(() => {
 $('#play3').click(() => {
     console.log('Play 3 - Starting third media in all rooms')
     $('#play3').text('Playing 3...')
-    socket.emit('playindex', 2)
+    playIndex(2)
     showNotification('Starting third media in all rooms')
     setTimeout(() => $('#play3').text('Play 3'), 1000)
 })

@@ -44,11 +44,14 @@ MEDIA.loadroom = (room) => {
 
         if (!MEDIA.conf[room].medias[file]) MEDIA.conf[room].medias[file] = {'hash': hash};
         
-        // hash changed -> remove the 'filename' subfolder
+        // hash changed -> remove the 'filename' subfolder and thumbvideo
         if (MEDIA.conf[room].medias[file].hash !== hash) {
             MEDIA.conf[room].medias[file].hash = hash;
             MEDIA.conf[room].medias[file].resolution = { x: 0, y: 0 };
-            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder, {recursive: true});
+            if (fs.existsSync(subfolder)) fs.rmSync(subfolder, {recursive: true});
+            // Remove thumbvideo if it exists
+            const thumbFile = path.join(VIDEO_PATH, room, '_thumbvideos', name + '_240p.mp4');
+            if (fs.existsSync(thumbFile)) fs.unlinkSync(thumbFile);
         }
     })
 
@@ -76,7 +79,7 @@ MEDIA.loadroom = (room) => {
         // if the media is not in the folder, remove it from the MEDIA.conf
         // and remove the 'filename' subfolder
         if (!files.includes(media)) {
-            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder, {recursive: true});
+            if (fs.existsSync(subfolder)) fs.rmSync(subfolder, {recursive: true});
             delete MEDIA.conf[room].medias[media];
             continue
         }
@@ -215,14 +218,66 @@ MEDIA.devicechanged = async function (uuid, room) {
 
 
 // Get the configuration of a given media
-MEDIA.info = function (path) {
-    let room = path.split('/')[0];
-    let video = path.split('/')[1];
+MEDIA.info = function (mediapath) {
+    let room = mediapath.split('/')[0];
+    let video = mediapath.split('/')[1];
     if (!room || !video) return {};
     if (!MEDIA.conf[room]) return {};
     if (!MEDIA.conf[room].medias) return {};
     if (!MEDIA.conf[room].medias[video]) return {};
-    return MEDIA.conf[room].medias[video];
+    let info = MEDIA.conf[room].medias[video];
+    // Check if thumbvideo exists
+    const name = video.split('.').slice(0, -1).join('.');
+    const thumbFile = path.join(VIDEO_PATH, room, '_thumbvideos', name + '_240p.mp4');
+    info.thumbvideo = fs.existsSync(thumbFile) ? path.join(room, '_thumbvideos', name + '_240p.mp4') : null;
+    return info;
+}
+
+// Get thumbvideo filesystem path for a media
+MEDIA.thumbvideoPath = function (mediapath) {
+    let room = mediapath.split('/')[0];
+    let video = mediapath.split('/')[1];
+    if (!room || !video) return null;
+    const name = video.split('.').slice(0, -1).join('.');
+    return path.join(VIDEO_PATH, room, '_thumbvideos', name + '_240p.mp4');
+}
+
+// Check if thumbvideo exists for a media
+MEDIA.hasThumbvideo = function (mediapath) {
+    const thumbFile = MEDIA.thumbvideoPath(mediapath);
+    return thumbFile ? fs.existsSync(thumbFile) : false;
+}
+
+// Generate a 240p thumbvideo for a media
+MEDIA.generateThumbvideo = function (mediapath) {
+    return new Promise((resolve, reject) => {
+        let room = mediapath.split('/')[0];
+        let video = mediapath.split('/')[1];
+        if (!room || !video) return reject('Invalid media path');
+
+        const filepath = path.join(VIDEO_PATH, mediapath);
+        const thumbDir = path.join(VIDEO_PATH, room, '_thumbvideos');
+        const name = video.split('.').slice(0, -1).join('.');
+        const thumbFile = path.join(thumbDir, name + '_240p.mp4');
+
+        if (!fs.existsSync(thumbDir)) fs.mkdirSync(thumbDir, {recursive: true});
+
+        // Remove existing thumbvideo
+        if (fs.existsSync(thumbFile)) fs.unlinkSync(thumbFile);
+
+        const cmd = `ffmpeg -i "${filepath}" -vf "scale=-2:240" -c:v libx264 -profile:v baseline -level 3.0 -preset fast -crf 28 -maxrate 500k -bufsize 1M -x264-params bframes=0 -movflags +faststart -pix_fmt yuv420p -c:a aac -b:a 64k -ar 22050 "${thumbFile}"`;
+
+        console.log('Generating thumbvideo:', thumbFile);
+        exec(cmd, {stdio: 'inherit'}, (error, stdout, stderr) => {
+            if (error) {
+                console.error('Error generating thumbvideo:', error);
+                reject(error);
+            } else {
+                console.log('Thumbvideo generated:', thumbFile);
+                resolve(thumbFile);
+            }
+        });
+    });
 }
 
 MEDIA.unsnap = async function (device, media) {

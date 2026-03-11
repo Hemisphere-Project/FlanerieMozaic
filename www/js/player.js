@@ -1,3 +1,21 @@
+// Global load queue: serialize video loads so each fully buffers before the next starts,
+// avoiding HTTP/1.1 connection exhaustion (browsers limit ~6 connections per origin)
+// Disabled when HTTP/2 is available (_control pages use port 8443)
+const _loadQueue = []
+let _loadActive = 0
+const _loadMax = 1
+
+function _processLoadQueue() {
+    while (_loadActive < _loadMax && _loadQueue.length > 0) {
+        const job = _loadQueue.shift()
+        _loadActive++
+        job.run().finally(() => {
+            _loadActive--
+            _processLoadQueue()
+        })
+    }
+}
+
 class VideoPlayer extends EventEmitter {
     
     // constructor
@@ -173,7 +191,7 @@ class VideoPlayer extends EventEmitter {
 
         if (this.media == '#camera') 
         {
-            navigator.mediaDevices.getUserMedia({video: true})
+            this._loadReady = navigator.mediaDevices.getUserMedia({video: true})
                 .then((stream) => {
                     this.video[0].srcObject = stream;
                     this.video[0].play()
@@ -184,32 +202,110 @@ class VideoPlayer extends EventEmitter {
         } 
         else 
         {   
-            if (this.video[0].srcObject) {
-                this.video[0].srcObject.getTracks().forEach(track => track.stop());
-                this.video[0].srcObject = null
-            }
-            let src = '/media/'+media
-            
-            // Dirty hack to serve media from NGINX on 10.0.0.1
-            if (window.location.href.indexOf('10.0.0.1') != -1) 
-                src = 'http://10.0.0.1:8888/'+media
+            this._loadReady = this._loadSource(media)
+        }
+        console.log('load', media, 'src:', this.video.attr('src'))
+    }
 
-            if (window.location.href.indexOf('10.0.0.2') != -1) 
-                src = 'http://10.0.0.2:8888/'+media
+    _loadSource(media) {
+        if (this.video[0].srcObject) {
+            this.video[0].srcObject.getTracks().forEach(track => track.stop());
+            this.video[0].srcObject = null
+        }
+        let src = '/media/'+media
+        
+        // Serve media from NGINX
+        if (window.location.href.indexOf('10.0.0.1') != -1 || window.location.href.indexOf('10.0.0.2') != -1) {
+            let host = window.location.href.indexOf('10.0.0.1') != -1 ? '10.0.0.1' : '10.0.0.2'
+            // Control pages use HTTPS/HTTP2 port to avoid connection limit
+            if (this.uuid.startsWith('_control'))
+                src = 'https://'+host+':8443/'+media
+            else
+                src = 'http://'+host+':8888/'+media
+        }
 
+        // Control pages bypass queue (HTTP/2 handles multiplexing)
+        if (this.uuid.startsWith('_control')) {
             this.video.attr('src', src)
             this.video[0].load()
             this.video[0].pause()
+            return new Promise((resolve, reject) => {
+                const cleanup = () => {
+                    this.video[0].removeEventListener('loadedmetadata', onReady)
+                    this.video[0].removeEventListener('error', onError)
+                }
+                const onReady = () => { cleanup(); resolve() }
+                const onError = () => {
+                    cleanup()
+                    console.error('Failed to load', media)
+                    reject(new Error('Failed to load media: ' + media))
+                }
+                this.video[0].addEventListener('loadedmetadata', onReady, {once: true})
+                this.video[0].addEventListener('error', onError, {once: true})
+            })
         }
-        console.log('load', media, 'src:', this.video.attr('src'))
 
+        // Non-control: queue loads to respect HTTP/1.1 connection limit
+        return new Promise((resolve, reject) => {
+            const job = {
+                run: () => {
+                    if (this.media !== media) { resolve(); return Promise.resolve() }
+                    this.video.attr('src', src)
+                    this.video[0].load()
+                    this.video[0].pause()
+                    return new Promise((queueDone) => {
+                        const cleanup = () => {
+                            this.video[0].removeEventListener('loadedmetadata', onMeta)
+                            this.video[0].removeEventListener('progress', onProgress)
+                            this.video[0].removeEventListener('error', onError)
+                        }
+                        const onMeta = () => {
+                            resolve()
+                        }
+                        const onProgress = () => {
+                            const buf = this.video[0].buffered
+                            const dur = this.video[0].duration
+                            if (buf.length > 0 && dur > 0 && buf.end(buf.length - 1) >= dur - 0.5) {
+                                cleanup()
+                                queueDone()
+                            }
+                        }
+                        const onError = () => {
+                            cleanup()
+                            console.error('Failed to load', media)
+                            reject(new Error('Failed to load media: ' + media))
+                            queueDone()
+                        }
+                        this.video[0].addEventListener('loadedmetadata', onMeta, {once: true})
+                        this.video[0].addEventListener('progress', onProgress)
+                        this.video[0].addEventListener('error', onError, {once: true})
+                        setTimeout(() => { cleanup(); queueDone() }, 15000)
+                    })
+                }
+            }
+            _loadQueue.push(job)
+            _processLoadQueue()
+        })
     }
 
     play(media) {
         if (media && media != this.media) this.load(media)
         else if (this.media == '') return Promise.resolve()
         console.log('play!')
-        // $('#logs').text('play! '+ media)
+
+        // Wait for source to be loaded before playing
+        const doPlay = () => this._doPlay()
+        if (this._loadReady) {
+          return this._loadReady.then(doPlay).catch(err => {
+            console.warn('Load not ready, will retry on next sync:', err.message)
+            return Promise.resolve()
+          })
+        }
+
+        return this._doPlay()
+    }
+
+    _doPlay() {
         this.video[0].currentTime = 0
         this.video[0].style.visibility = 'visible'
         

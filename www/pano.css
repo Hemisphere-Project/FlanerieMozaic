@@ -282,6 +282,30 @@ ul .btn-playlist {
 .miniplayer {
     width: 100%;
     min-height: 160px;
+    position: relative;
+}
+
+.miniplayer .res-tag {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    z-index: 10;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    pointer-events: none;
+}
+
+.miniplayer .res-tag.res-thumb {
+    background: #e8a317;
+    color: #1a1a1a;
+}
+
+.miniplayer .res-tag.res-full {
+    background: #2e7d32;
+    color: #fff;
 }
 
 .miniplayer .player {
@@ -578,4 +602,58 @@ ul .btn-playlist {
     font-size: 14px;
     opacity: 0;
     transition: opacity 0.3s ease;
+}
+
+#ffmpeg_toast {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+
+#ffmpeg_toast .job {
+    background: #e8a317;
+    color: #1a1a1a;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    animation: toastIn .25s ease;
+}
+
+#ffmpeg_toast .job.done {
+    background: #2e7d32;
+}
+
+#ffmpeg_toast .job.error {
+    background: #c62828;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(30px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+#cert_banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2000;
+    background: #c62828;
+    color: #fff;
+    text-align: center;
+    padding: 12px 20px;
+    font-size: 14px;
+}
+
+#cert_banner a {
+    color: #fff;
+    font-weight: bold;
+    text-decoration: underline;
 } 
