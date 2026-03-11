@@ -205,13 +205,17 @@ class SyncPlayer extends VideoPlayer {
       }
     }
 
+    // Wait for video to have enough data before syncing
+    if (this.element.readyState < 2 || this.element.seeking) {
+      return this.nextupdate();
+    }
+
     const targetTime = this.getSyncTime();
     const videoCurrentTime = this.element.currentTime;
     const now = currentTime; // Use the same timestamp for consistency
     
     // Validate all time values to prevent non-finite errors
     if (!isFinite(targetTime) || !isFinite(videoCurrentTime) || !isFinite(this.element.duration) || this.element.duration <= 0) {
-      logp('WARN: Invalid time values detected:', JSON.stringify({ targetTime, videoCurrentTime, duration: this.element.duration }));
       return this.nextupdate();
     }
     
