@@ -47,7 +47,7 @@ MEDIA.loadroom = (room) => {
         if (MEDIA.conf[room].medias[file].hash !== hash) {
             MEDIA.conf[room].medias[file].hash = hash;
             MEDIA.conf[room].medias[file].resolution = { x: 0, y: 0 };
-            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder);
+            if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder, {recursive: true});
         }
     })
 
