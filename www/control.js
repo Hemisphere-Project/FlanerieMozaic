@@ -32,8 +32,10 @@ socket.on('rooms', (data) => {
     console.log('rooms', data)
     $('#rooms').empty()
 
-    // clear previous rooms
-    // TODO
+    // clear previous room sockets
+    for (let k in ROOMS) {
+        if (ROOMS[k].socket) ROOMS[k].socket.disconnect()
+    }
 
     ROOMS = data
 
