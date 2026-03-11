@@ -103,7 +103,10 @@ socket.on('medialist', (data) => {
 socket.on('state', (data) => {
     // media
     ACTIVEMEDIA = {media: (data.media != '') ? data.media : data.lastmedia, mediainfo: data.mediainfo}
-    $('#medianame').text(ACTIVEMEDIA.media.split('/').pop())
+    try{ $('#medianame').text(ACTIVEMEDIA.media.split('/').pop())
+    } catch {
+        $('#medianame').text('-');
+    }
 
     // submedia per devices
     if (data.mediainfo.submedias !== undefined) devices.updateSubmedia(data.mediainfo.submedias)

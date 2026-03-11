@@ -287,7 +287,8 @@ MEDIA.snap = function(device, media) {
         let snapH = Math.round(Dh / zoom);
         
         // Find the smallest standard resolution that fits the snap [240p, 360p, 480p, 720p]
-        const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720]];
+        // const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720]];
+        const resolutions = [[426, 240], [640, 360], [854, 480], [1024, 576]];
         var standardW = resolutions[resolutions.length - 1][0];
         var standardH = resolutions[resolutions.length - 1][1];
         for (let i = 0; i < resolutions.length; i++) {
