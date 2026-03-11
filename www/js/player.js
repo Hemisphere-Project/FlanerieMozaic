@@ -36,6 +36,7 @@ class VideoPlayer extends EventEmitter {
         this.origin = null
         
         this.submediaplayback = false
+        this._submediaScale = 1
         
         
         // the video element
@@ -115,7 +116,7 @@ class VideoPlayer extends EventEmitter {
     setvideocss() {
         if (this.submediaplayback) {
             this.video.addClass('maxiplayer')
-            let scale = this._globalzoom* this._localzoom
+            let scale = (this._globalzoom * this._localzoom) / this._submediaScale
             this.video.css('transform', 'scale('+scale+') translate( 0px, 0px)')
         }
         else {
@@ -165,8 +166,9 @@ class VideoPlayer extends EventEmitter {
     }
 
     // submedia mode (fullscreen with no zoom/offset)
-    setsubmediamode(mode) {
+    setsubmediamode(mode, submediaScale) {
         this.submediaplayback = mode
+        this._submediaScale = submediaScale || 1
         this.setvideocss()
     }
 

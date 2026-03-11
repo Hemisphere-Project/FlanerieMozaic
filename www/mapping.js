@@ -55,6 +55,16 @@ socket.on('hello', () => {
     socket.emit('hi', UUID, room, {x: window.innerWidth, y: window.innerHeight})
 });
 
+// FFmpeg toast
+socket.on('ffmpeg-status', (jobs) => {
+    const toast = $('#ffmpeg_toast')
+    toast.empty()
+    for (let j of jobs) {
+        let cls = 'job' + (j.status === 'done' ? ' done' : j.status === 'error' ? ' error' : '')
+        $('<div>').addClass(cls).text(`${j.type} ${j.description} — ${j.status}`).appendTo(toast)
+    }
+})
+
 // socket.on('zoom', (data) => {
 //    player.globalzoom(data)
 // })

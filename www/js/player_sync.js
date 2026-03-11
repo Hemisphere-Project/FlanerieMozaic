@@ -144,8 +144,12 @@ class SyncPlayer extends VideoPlayer {
         else this.load(mediaplay)
       }
 
-      // Submedia mode
-      this.setsubmediamode(playingsubmedia)
+      // Submedia mode + scale factor
+      let submediaScale = 1
+      if (playingsubmedia && data.mediainfo.submediaScales && data.mediainfo.submediaScales[this.uuid]) {
+        submediaScale = data.mediainfo.submediaScales[this.uuid]
+      }
+      this.setsubmediamode(playingsubmedia, submediaScale)
 
       // Media position & zoom
       if (data.mediainfo.offset) this.globalposition(data.mediainfo.offset)

@@ -190,6 +190,7 @@ MEDIA.configure = async function (media, key, value) {
     await fsp.rm(subfolder, {recursive: true, force: true});
     await fsp.mkdir(subfolder, {recursive: true});
     MEDIA.conf[room].medias[video].submedias = [];
+    MEDIA.conf[room].medias[video].submediaScales = {};
 
     MEDIA.save();
     return MEDIA.conf[room].medias[video]
@@ -211,6 +212,7 @@ MEDIA.devicechanged = async function (uuid, room) {
             }
         }
         media.submedias = media.submedias.filter((s) => { return !s.startsWith(uuid + '-'); });
+        if (media.submediaScales) delete media.submediaScales[uuid];
     }
     MEDIA.save();
     return didchange
@@ -297,6 +299,9 @@ MEDIA.unsnap = async function (device, media) {
     }
     media.submedias = media.submedias.filter((s) => { return !s.startsWith(device.uuid + '-'); });
 
+    // Clean up scale factor
+    if (media.submediaScales) delete media.submediaScales[device.uuid];
+
     MEDIA.save();
 }
 
@@ -344,31 +349,46 @@ MEDIA.snap = function(device, media) {
         // Zoom
         const zoom = Dz*Mz;
 
-        // Target snap size 
-        let snapW = Math.round(Dw / zoom);
-        let snapH = Math.round(Dh / zoom);
+        // Target snap size (full visible area in source pixels)
+        const snapW = Math.round(Dw / zoom);
+        const snapH = Math.round(Dh / zoom);
         
-        // Find the smallest standard resolution that fits the snap [240p, 360p, 480p, 720p]
-        // const resolutions = [[426, 240], [640, 360], [854, 480], [1280, 720]];
-        const resolutions = [[426, 240], [640, 360], [854, 480], [1024, 576]];
-        var standardW = resolutions[resolutions.length - 1][0];
-        var standardH = resolutions[resolutions.length - 1][1];
-        for (let i = 0; i < resolutions.length; i++) {
-            if (resolutions[i][0] >= snapW && resolutions[i][1] >= snapH) {
-                standardW = resolutions[i][0];
-                standardH = resolutions[i][1];
-                break;
+        // Standard resolutions (landscape + portrait)
+        // const baseRes = [[426, 240], [640, 360], [854, 480], [1280, 720]];
+        const baseRes = [[426, 240], [640, 360], [854, 480]];
+        const resolutions = [...baseRes, ...baseRes.map(r => [r[1], r[0]])];
+
+        // Find best standard resolution: prefer smallest that contains snap,
+        // otherwise pick the one requiring least downscale (highest scaleFactor)
+        let standardW = null, standardH = null, scaleFactor = 1.0;
+        let bestContainArea = Infinity;
+        let bestDownscaleSF = 0;
+        let dsW, dsH;
+
+        for (const [rw, rh] of resolutions) {
+            if (rw >= snapW && rh >= snapH) {
+                const area = rw * rh;
+                if (area < bestContainArea) {
+                    bestContainArea = area;
+                    standardW = rw;
+                    standardH = rh;
+                    scaleFactor = 1.0;
+                }
+            } else {
+                const sf = Math.min(rw / snapW, rh / snapH);
+                if (sf > bestDownscaleSF) {
+                    bestDownscaleSF = sf;
+                    dsW = rw;
+                    dsH = rh;
+                }
             }
         }
 
-        // make snapW and snapH smaller than standardW and standardH while keeping the aspect ratio
-        if (snapW > standardW) {
-            snapH = Math.round(snapH * (standardW / snapW));
-            snapW = standardW;
-        }
-        if (snapH > standardH) {
-            snapW = Math.round(snapW * (standardH / snapH));
-            snapH = standardH;
+        // If no resolution contains the snap, use best downscale option
+        if (standardW === null) {
+            standardW = dsW || 1024;
+            standardH = dsH || 576;
+            scaleFactor = bestDownscaleSF || Math.min(1024 / snapW, 576 / snapH);
         }
 
         // Target snap position
@@ -393,20 +413,28 @@ MEDIA.snap = function(device, media) {
 
     
 
-        console.log('snap', snapW, snapH, 'standard', standardW, standardH);
+        console.log('snap', snapW, snapH, 'standard', standardW, standardH, 'scaleFactor', scaleFactor);
 
-        // Build simplified FFmpeg command
+        // Build FFmpeg filter: crop → (scale if needed) → pad to standard
+        let vf;
+        if (scaleFactor < 1) {
+            let scCropW = Math.round(cropW * scaleFactor);
+            let scCropH = Math.round(cropH * scaleFactor);
+            scCropW += scCropW % 2;  // ensure even for H.264
+            scCropH += scCropH % 2;
+            scCropW = Math.min(scCropW, standardW);
+            scCropH = Math.min(scCropH, standardH);
+            const scPadLeft = Math.min(Math.round(padLeft * scaleFactor), standardW - scCropW);
+            const scPadTop = Math.min(Math.round(padTop * scaleFactor), standardH - scCropH);
+            vf = `crop=${cropW}:${cropH}:${cropX}:${cropY},scale=${scCropW}:${scCropH},pad=${standardW}:${standardH}:${scPadLeft}:${scPadTop}:black`;
+        } else {
+            vf = `crop=${cropW}:${cropH}:${cropX}:${cropY},pad=${standardW}:${standardH}:${padLeft}:${padTop}:black`;
+        }
+
         const cmd = `ffmpeg -i "${filepath}" \
-                        -vf "crop=${cropW}:${cropH}:${cropX}:${cropY},pad=${standardW}:${standardH}:${padLeft}:${padTop}:black" \
+                        -vf "${vf}" \
                         -c:v libx264 -profile:v baseline -level 3.0 -preset slow -crf 20 -maxrate 1M -bufsize 2M -x264-params bframes=0 -movflags +faststart -pix_fmt yuv420p -c:a aac -b:a 128k -ar 44100 \
                         "${submedia}"`;
-
-        // rescale finale video to 640x480
-        // const cmd = `ffmpeg -i "${filepath}" \
-        //                 -vf "crop=${cropW}:${cropH}:${cropX}:${cropY},pad=${snapW}:${snapH}:${padLeft}:${padTop}:black" \
-        //                 -vf "scale=320:240" \
-        //                 -c:v libx264 -profile:v baseline -level 3.0 -preset slow -crf 20 -x264-params bframes=0 -movflags +faststart -pix_fmt yuv420p -c:a aac -b:a 128k -ar 44100 \
-        //                 "${submedia}"`;
 
         // Execute the command sync
 
@@ -422,6 +450,11 @@ MEDIA.snap = function(device, media) {
                 // Push into submedias list
                 if (!media.submedias) media.submedias = [];
                 media.submedias.push(path.basename(submedia));
+
+                // Store scaleFactor for this device
+                if (!media.submediaScales) media.submediaScales = {};
+                media.submediaScales[device.uuid] = scaleFactor;
+
                 MEDIA.save();
                 
                 resolve();
