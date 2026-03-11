@@ -194,6 +194,9 @@ class VideoPlayer extends EventEmitter {
             if (window.location.href.indexOf('10.0.0.1') != -1) 
                 src = 'http://10.0.0.1:8888/'+media
 
+            if (window.location.href.indexOf('10.0.0.2') != -1) 
+                src = 'http://10.0.0.2:8888/'+media
+
             this.video.attr('src', src)
             this.video[0].load()
             this.video[0].pause()
