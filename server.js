@@ -300,21 +300,21 @@ io.on('connection', (socket) =>
   })
 
   // Configure media
-  socket.on('mediaconf', (media, key, val) => {
+  socket.on('mediaconf', async (media, key, val) => {
     if (!checkSocket(socket)) return;
-    MEDIA.configure(media, key, val)
+    await MEDIA.configure(media, key, val)
     infoState(socket.room)
   })
 
   // Configure device
-  socket.on('deviceconf', (key, val, uuid) => {
+  socket.on('deviceconf', async (key, val, uuid) => {
     if (!checkSocket(socket)) return;
     uuid = uuid || socket.uuid;
     device(uuid, socket.room)[key] = val; 
     
     let dc = false
     if (key === 'position' || key === 'zoomdevice')
-      dc = MEDIA.devicechanged(uuid, socket.room)
+      dc = await MEDIA.devicechanged(uuid, socket.room)
 
     if (dc) infoState(socket.room);
     infoDevices(socket.room);
@@ -345,7 +345,7 @@ io.on('connection', (socket) =>
   })
 
   // generatee submedia 
-  socket.on('snap', (uuid, media) => {
+  socket.on('snap', async (uuid, media) => {
     if (!checkSocket(socket)) return;
     if (!uuid) return;
     if (uuid.startsWith('guest')) return;
@@ -355,7 +355,7 @@ io.on('connection', (socket) =>
 
     let dev = device(uuid, socket.room);
 
-    MEDIA.unsnap(dev, media)
+    await MEDIA.unsnap(dev, media)
     infoState(socket.room, uuid);
     var now = Date.now();
 
@@ -398,7 +398,7 @@ io.on('connection', (socket) =>
   })
 
   // Move device
-  socket.on('move', (delta, uuid) => 
+  socket.on('move', async (delta, uuid) => 
   {
     if (!checkSocket(socket)) return;
     let dc = false;
@@ -408,13 +408,13 @@ io.on('connection', (socket) =>
     dev.position.x += delta.x;
     dev.position.y += delta.y;
 
-    dc = MEDIA.devicechanged(uuid, socket.room)
+    dc = await MEDIA.devicechanged(uuid, socket.room)
     if (dc) infoState(socket.room);
     infoDevices(socket.room);
   })
 
   // Move all devices
-  socket.on('moveAll', (delta) => 
+  socket.on('moveAll', async (delta) => 
   {
     if (!checkSocket(socket)) return;
     let dc = false;
@@ -422,14 +422,14 @@ io.on('connection', (socket) =>
       let dev = device(uuid, socket);
       dev.position.x += delta.x*dev.zoomdevice;
       dev.position.y += delta.y*dev.zoomdevice;
-      dc = MEDIA.devicechanged(uuid, socket.room)
+      dc = await MEDIA.devicechanged(uuid, socket.room)
     }
     if (dc) infoState(socket.room);
     infoDevices(socket.room);
   })
 
   // Clear devices
-  socket.on('clearDevices', () => 
+  socket.on('clearDevices', async () => 
   {
     if (!checkSocket(socket)) return;
     let dc = false;
@@ -438,7 +438,7 @@ io.on('connection', (socket) =>
       if (dev.alive) dev.alive = false;
       else if (!uuid.startsWith('guest')) {
         delete room(socket).devices[uuid];
-        dc = MEDIA.devicechanged(uuid, socket.room)
+        dc = await MEDIA.devicechanged(uuid, socket.room)
       }
     }
     if (dc) infoState(socket.room);
@@ -509,12 +509,12 @@ io.on('connection', (socket) =>
   })
 
   // snapAll
-  socket.on('snapAll', (media) => {
+  socket.on('snapAll', async (media) => {
     if (!checkSocket(socket)) return;
 
     for (let uuid in room(socket).devices) {
       let dev = device(uuid, socket);
-      MEDIA.unsnap(dev, media)
+      await MEDIA.unsnap(dev, media)
     }
     infoState(socket.room);
     var now = Date.now();

@@ -1,6 +1,7 @@
 // Media module
 
 import fs from 'fs';
+const fsp = fs.promises;
 import path from 'path';
 import crypto from 'crypto';
 import ffmpeg from 'fluent-ffmpeg';
@@ -145,10 +146,15 @@ MEDIA.addRoom = (room) => {
 }
 
 
+var _saveTimeout = null;
 MEDIA.save = () => {
     if (!MEDIA_FILE) throw new Error('MEDIA_FILE not set');
-    fs.writeFileSync(MEDIA_FILE, JSON.stringify(MEDIA.conf, null, 4));
-    // console.log('MEDIA', JSON.stringify(MEDIA.conf, null, 4));
+    if (_saveTimeout) clearTimeout(_saveTimeout);
+    _saveTimeout = setTimeout(() => {
+        _saveTimeout = null;
+        fsp.writeFile(MEDIA_FILE, JSON.stringify(MEDIA.conf, null, 4))
+            .catch(err => console.error('Error saving media config:', err));
+    }, 500);
 }
 
 // Get the list of videos in a room
@@ -167,7 +173,7 @@ MEDIA.medialist = (room) => {
 
 
 // Configure a given media
-MEDIA.configure = function (media, key, value) {
+MEDIA.configure = async function (media, key, value) {
     let room = media.split('/')[0];
     let video = media.split('/')[1];
     if (!room || !video) return {};
@@ -178,8 +184,8 @@ MEDIA.configure = function (media, key, value) {
 
     // Media conf changed: destroy submedias folder and recreate
     const subfolder = path.join(VIDEO_PATH, MEDIA.conf[room].medias[video].subfolder);
-    if (fs.existsSync(subfolder)) fs.rmdirSync(subfolder, {recursive: true});
-    fs.mkdirSync(subfolder);
+    await fsp.rm(subfolder, {recursive: true, force: true});
+    await fsp.mkdir(subfolder, {recursive: true});
     MEDIA.conf[room].medias[video].submedias = [];
 
     MEDIA.save();
@@ -187,7 +193,7 @@ MEDIA.configure = function (media, key, value) {
 }
 
 // Device configuration changed: remove all submedia with the device uuid in that room
-MEDIA.devicechanged = function (uuid, room) {
+MEDIA.devicechanged = async function (uuid, room) {
     let didchange = false;
     for (let m in MEDIA.conf[room].medias) {
         const media = MEDIA.conf[room].medias[m];
@@ -195,10 +201,10 @@ MEDIA.devicechanged = function (uuid, room) {
             const submedias = media.submedias.filter((s) => { return s.startsWith(uuid + '-'); });
             for (let submedia of submedias) {
                 const submediaPath = path.join(VIDEO_PATH, media.subfolder, submedia);
-                if (fs.existsSync(submediaPath)) {
-                    fs.unlinkSync(submediaPath);
+                try {
+                    await fsp.unlink(submediaPath);
                     didchange = true;
-                }
+                } catch(e) { if (e.code !== 'ENOENT') console.error('unlink error:', e); }
             }
         }
         media.submedias = media.submedias.filter((s) => { return !s.startsWith(uuid + '-'); });
@@ -219,7 +225,7 @@ MEDIA.info = function (path) {
     return MEDIA.conf[room].medias[video];
 }
 
-MEDIA.unsnap = function (device, media) {
+MEDIA.unsnap = async function (device, media) {
     media = MEDIA.info(media);
 
     if (!media || !media.filepath) return
@@ -231,7 +237,8 @@ MEDIA.unsnap = function (device, media) {
     const submedias = media.submedias.filter((s) => { return s.startsWith(device.uuid + '-'); });
     for (let submedia of submedias) {
         const submediaPath = path.join(subfolder, submedia);
-        if (fs.existsSync(submediaPath)) fs.unlinkSync(submediaPath);
+        try { await fsp.unlink(submediaPath); }
+        catch(e) { if (e.code !== 'ENOENT') console.error('unlink error:', e); }
     }
     media.submedias = media.submedias.filter((s) => { return !s.startsWith(device.uuid + '-'); });
 
